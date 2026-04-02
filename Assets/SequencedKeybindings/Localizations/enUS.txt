@@ -1,0 +1,8 @@
+SequencedKeys.KeyBindingGroup,Sequenced Keys
+SequencedKeys.Activate,Enter Sequence Mode
+SequencedKeys.Exit,Exit Sequence Mode
+SequencedKeys.Key0,Sequence Key 1
+SequencedKeys.Key1,Sequence Key 2
+SequencedKeys.Key2,Sequence Key 3
+SequencedKeys.Key3,Sequence Key 4
+SequencedKeys.NextPage,Next Page

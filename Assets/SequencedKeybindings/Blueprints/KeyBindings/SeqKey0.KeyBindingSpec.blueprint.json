@@ -1,0 +1,13 @@
+{
+  "KeyBindingSpec": {
+    "Id": "SequencedKeys.Key0",
+    "GroupId": "SequencedKeys",
+    "LocKey": "SequencedKeys.Key0",
+    "Order": 10,
+    "AllowOtherModifiers": false
+  },
+  "PrimaryInputBindingSpec": {
+    "Path": "<Keyboard>/q",
+    "InputModifiers": "None"
+  }
+}

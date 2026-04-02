@@ -1,0 +1,13 @@
+{
+  "KeyBindingSpec": {
+    "Id": "SequencedKeys.Exit",
+    "GroupId": "SequencedKeys",
+    "LocKey": "SequencedKeys.Exit",
+    "Order": 1,
+    "AllowOtherModifiers": false
+  },
+  "PrimaryInputBindingSpec": {
+    "Path": "<Keyboard>/escape",
+    "InputModifiers": "None"
+  }
+}

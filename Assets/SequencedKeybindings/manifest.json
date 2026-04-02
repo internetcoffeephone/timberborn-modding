@@ -1,0 +1,8 @@
+{
+  "Name": "Sequenced Keybindings",
+  "Version": "0.1.0",
+  "Description": "Dwarf Fortress-style sequenced keyboard shortcuts for the building toolbar. Press a hotkey to enter sequence mode, then navigate toolbar groups with Q/W/E/R.",
+  "EntryDll": "SequencedKeybindings.dll",
+  "Dependencies": [],
+  "MinimumGameVersion": "0.6.0.0"
+}

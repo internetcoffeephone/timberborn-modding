@@ -1,0 +1,13 @@
+{
+  "KeyBindingSpec": {
+    "Id": "SequencedKeys.NextPage",
+    "GroupId": "SequencedKeys",
+    "LocKey": "SequencedKeys.NextPage",
+    "Order": 20,
+    "AllowOtherModifiers": false
+  },
+  "PrimaryInputBindingSpec": {
+    "Path": "<Keyboard>/tab",
+    "InputModifiers": "None"
+  }
+}

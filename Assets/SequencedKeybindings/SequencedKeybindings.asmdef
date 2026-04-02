@@ -1,0 +1,26 @@
+{
+  "name": "SequencedKeybindings",
+  "rootNamespace": "SequencedKeybindings",
+  "references": [
+    "Bindito.Core",
+    "Timberborn.CoreUI",
+    "Timberborn.InputSystem",
+    "Timberborn.KeyBindingSystem",
+    "Timberborn.ToolSystem",
+    "Timberborn.ToolSystemUI",
+    "Timberborn.BottomBarSystem",
+    "Timberborn.BlockObjectTools",
+    "Timberborn.BlockObjectToolsUI",
+    "Timberborn.Modding",
+    "Timberborn.Common"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": false,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}
