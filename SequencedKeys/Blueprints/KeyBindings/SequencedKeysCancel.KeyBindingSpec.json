@@ -7,7 +7,7 @@
     "AllowOtherModifiers": false
   },
   "PrimaryInputBindingSpec": {
-    "Path": "/Keyboard/escape",
+    "Path": "/Keyboard/g",
     "InputModifiers": "None"
   }
 }

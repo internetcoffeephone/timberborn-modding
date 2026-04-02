@@ -4,13 +4,13 @@ Navigate toolbar menus using keyboard sequences. Press an entry hotkey, then use
 
 ## How It Works
 
-1. Press the **activation hotkey** (default: `` ` `` backtick/tilde) to enter sequenced build mode
+1. Press the **activation hotkey** (default: `B`) to enter sequenced build mode
 2. The bottom toolbar buttons are divided into groups, each labeled with a key hint badge
-3. Press one of the **selection keys** (default: `Q`, `W`, `E`, `R`) to pick a group
+3. Press one of the **selection keys** (default: `Q W E R A S D F Z X C V`) to pick a group
 4. If the group contains multiple buttons, they subdivide further — repeat step 3
 5. If only one button remains, it is activated automatically
 6. If the button opens a submenu, the new buttons are scanned and the process repeats
-7. Press **Escape** at any time to cancel
+7. Press `G` at any time to cancel
 
 ## Visual Feedback
 
@@ -23,18 +23,46 @@ All keys are rebindable in the game's keybinding settings under the "Sequenced K
 
 | Action | Default Key | Description |
 |--------|-------------|-------------|
-| Activate | `` ` `` | Enter sequenced build mode |
-| Select 1 | `Q` | Choose the first group |
-| Select 2 | `W` | Choose the second group |
-| Select 3 | `E` | Choose the third group |
-| Select 4 | `R` | Choose the fourth group |
-| Cancel | `Escape` | Exit sequenced build mode |
+| Activate | `B` | Enter sequenced build mode |
+| Select 1 | `Q` | Choose group 1 |
+| Select 2 | `W` | Choose group 2 |
+| Select 3 | `E` | Choose group 3 |
+| Select 4 | `R` | Choose group 4 |
+| Select 5 | `A` | Choose group 5 |
+| Select 6 | `S` | Choose group 6 |
+| Select 7 | `D` | Choose group 7 |
+| Select 8 | `F` | Choose group 8 |
+| Select 9 | `Z` | Choose group 9 |
+| Select 10 | `X` | Choose group 10 |
+| Select 11 | `C` | Choose group 11 |
+| Select 12 | `V` | Choose group 12 |
+| Cancel | `G` | Exit sequenced build mode |
 
-## Adding More Selection Keys
+## Adding or Removing Selection Keys
 
-To use more than 4 selection keys, add additional `KeyBindingSpec` JSON files in the `Blueprints/KeyBindings/` folder following the naming pattern `SequencedKeysSelect5.KeyBindingSpec.json`, etc. The mod automatically detects all registered selection keys at startup.
+To add more selection keys, create additional `KeyBindingSpec` JSON files in the `Blueprints/KeyBindings/` folder following the naming pattern `SequencedKeysSelect13.KeyBindingSpec.json`, etc. The mod automatically detects all registered selection keys at startup.
 
 You can also reduce to fewer keys (minimum 2) by removing spec files.
+
+## Debugging
+
+The mod outputs verbose log messages prefixed with `[SequencedKeys]`. To view them:
+
+1. Launch Timberborn
+2. Open the Unity log file:
+   - **Windows**: `%APPDATA%\..\LocalLow\Mechanistry\Timberborn\Player.log`
+   - **Linux**: `~/.config/unity3d/Mechanistry/Timberborn/Player.log`
+   - **macOS**: `~/Library/Logs/Mechanistry/Timberborn/Player.log`
+3. Search for `[SequencedKeys]` to find all mod log entries
+
+Key log messages to look for:
+- `Configurator.Configure() called` — confirms the DLL was loaded and DI is running
+- `Service constructor called` — confirms the service was instantiated
+- `Load() called` — confirms the singleton lifecycle started
+- `Activate binding found` — confirms the keybinding was registered correctly
+- `ProcessInput() is alive` — confirms input processing is active (logged after ~60 frames)
+- `Activation key pressed!` — confirms the entry hotkey was detected
+- `Scan found N visible button(s)` — confirms toolbar scanning is working
 
 ## Building
 

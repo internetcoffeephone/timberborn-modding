@@ -1,13 +1,13 @@
 {
   "KeyBindingSpec": {
-    "Id": "SequencedKeysActivate",
+    "Id": "SequencedKeysSelect8",
     "GroupId": "SequencedKeys",
-    "LocKey": "SequencedKeys.Activate",
-    "Order": 0,
+    "LocKey": "SequencedKeys.Select8",
+    "Order": 8,
     "AllowOtherModifiers": false
   },
   "PrimaryInputBindingSpec": {
-    "Path": "/Keyboard/b",
+    "Path": "/Keyboard/f",
     "InputModifiers": "None"
   }
 }
