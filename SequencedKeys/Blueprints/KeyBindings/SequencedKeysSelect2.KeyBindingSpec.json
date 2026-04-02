@@ -1,0 +1,13 @@
+{
+  "KeyBindingSpec": {
+    "Id": "SequencedKeysSelect2",
+    "GroupId": "SequencedKeys",
+    "LocKey": "SequencedKeys.Select2",
+    "Order": 2,
+    "AllowOtherModifiers": false
+  },
+  "PrimaryInputBindingSpec": {
+    "Path": "/Keyboard/w",
+    "InputModifiers": "None"
+  }
+}

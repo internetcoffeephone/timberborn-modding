@@ -1,0 +1,10 @@
+ID,Text,Comment
+SequencedKeys.KeyBindingGroup,Sequenced Keys,
+SequencedKeys.Activate,Enter Sequenced Build Mode,
+SequencedKeys.Select1,Selection Key 1,
+SequencedKeys.Select2,Selection Key 2,
+SequencedKeys.Select3,Selection Key 3,
+SequencedKeys.Select4,Selection Key 4,
+SequencedKeys.Cancel,Cancel Sequenced Build Mode,
+SequencedKeys.OverlayTitle,SEQUENCED KEYS,
+SequencedKeys.HintPress,Press a key to select:,

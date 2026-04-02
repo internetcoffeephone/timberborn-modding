@@ -1,0 +1,7 @@
+{
+  "Name": "Sequenced Keys",
+  "Version": "1.0.0",
+  "Id": "SequencedKeys",
+  "MinimumGameVersion": "1.0.0.0",
+  "Description": "Navigate toolbar menus using keyboard sequences. Press an entry hotkey, then use a small set of keys to drill down through button groups until you reach the building or action you want."
+}

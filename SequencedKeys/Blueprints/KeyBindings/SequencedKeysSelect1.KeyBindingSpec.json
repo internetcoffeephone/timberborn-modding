@@ -1,0 +1,13 @@
+{
+  "KeyBindingSpec": {
+    "Id": "SequencedKeysSelect1",
+    "GroupId": "SequencedKeys",
+    "LocKey": "SequencedKeys.Select1",
+    "Order": 1,
+    "AllowOtherModifiers": false
+  },
+  "PrimaryInputBindingSpec": {
+    "Path": "/Keyboard/q",
+    "InputModifiers": "None"
+  }
+}
