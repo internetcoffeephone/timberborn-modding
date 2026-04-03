@@ -25,7 +25,6 @@ namespace SequencedKeys
     {
         private readonly InputService _inputService;
         private readonly KeyBindingRegistry _keyBindingRegistry;
-        private readonly InputBindingDescriber _inputBindingDescriber;
         private readonly ToolbarScanner _toolbarScanner;
 
         private SequencedKeysOverlay _overlay;
@@ -59,12 +58,10 @@ namespace SequencedKeys
         public SequencedKeysService(
             InputService inputService,
             KeyBindingRegistry keyBindingRegistry,
-            InputBindingDescriber inputBindingDescriber,
             ToolbarScanner toolbarScanner)
         {
             _inputService = inputService;
             _keyBindingRegistry = keyBindingRegistry;
-            _inputBindingDescriber = inputBindingDescriber;
             _toolbarScanner = toolbarScanner;
             Debug.Log("[SequencedKeys] Service constructor called.");
         }
@@ -179,14 +176,21 @@ namespace SequencedKeys
             try
             {
                 var activateBinding = _keyBindingRegistry.Get(_activateKeyId);
-                var activePrimary = activateBinding?.PrimaryInputBinding;
-                var activeSecondary = activateBinding?.SecondaryInputBinding;
-                Debug.Log($"[SequencedKeys] Activate binding found: " +
-                          $"primary={activePrimary != null}, secondary={activeSecondary != null}");
-                if (activePrimary != null)
+                Debug.Log($"[SequencedKeys] Activate binding found: {activateBinding}");
+                Debug.Log($"[SequencedKeys] Activate binding type: {activateBinding?.GetType().FullName}");
+
+                // Log available properties for debugging API shape
+                if (activateBinding != null)
                 {
-                    Debug.Log($"[SequencedKeys] Activate key display text: " +
-                              $"'{_inputBindingDescriber.GetInputBindingText(activePrimary)}'");
+                    foreach (var prop in activateBinding.GetType().GetProperties())
+                    {
+                        try
+                        {
+                            var val = prop.GetValue(activateBinding);
+                            Debug.Log($"[SequencedKeys]   Activate.{prop.Name} = {val}");
+                        }
+                        catch { }
+                    }
                 }
             }
             catch (System.Exception ex)
@@ -199,8 +203,7 @@ namespace SequencedKeys
             try
             {
                 var cancelBinding = _keyBindingRegistry.Get(_cancelKeyId);
-                Debug.Log($"[SequencedKeys] Cancel binding found: " +
-                          $"primary={cancelBinding?.PrimaryInputBinding != null}");
+                Debug.Log($"[SequencedKeys] Cancel binding found: {cancelBinding}");
             }
             catch (System.Exception ex)
             {
@@ -250,20 +253,103 @@ namespace SequencedKeys
                       $"Labels: [{string.Join(", ", _selectKeyLabels)}]");
         }
 
+        /// <summary>
+        /// Extracts a human-readable label from a keybinding.
+        /// Tries to get the input binding path and format it as a readable key name.
+        /// Falls back gracefully if the KeyBinding API differs from expected.
+        /// </summary>
         private string GetKeyLabel(string keyId)
         {
             try
             {
                 var binding = _keyBindingRegistry.Get(keyId);
-                var primary = binding.PrimaryInputBinding ?? binding.SecondaryInputBinding;
-                if (primary != null)
-                    return _inputBindingDescriber.GetInputBindingText(primary);
+                if (binding == null)
+                    return keyId;
+
+                // Try to extract a readable label from the binding.
+                // KeyBinding API may vary between Timberborn versions, so
+                // we use ToString() as a generic fallback.
+                string bindingStr = binding.ToString();
+                Debug.Log($"[SequencedKeys] GetKeyLabel('{keyId}'): binding.ToString()='{bindingStr}'");
+
+                // Try accessing PrimaryInputBinding if available
+                try
+                {
+                    var primary = binding.PrimaryInputBinding;
+                    if (primary != null)
+                    {
+                        string path = primary.Path;
+                        Debug.Log($"[SequencedKeys] GetKeyLabel('{keyId}'): primary.Path='{path}'");
+                        if (!string.IsNullOrEmpty(path))
+                            return FormatInputBindingPath(path);
+
+                        // If Path didn't work, try ToString on the binding itself
+                        string primaryStr = primary.ToString();
+                        if (!string.IsNullOrEmpty(primaryStr))
+                            return FormatInputBindingPath(primaryStr);
+                    }
+                }
+                catch (System.Exception ex)
+                {
+                    Debug.Log($"[SequencedKeys] GetKeyLabel('{keyId}'): " +
+                              $"PrimaryInputBinding access failed: {ex.Message}");
+                }
+
+                // Try SecondaryInputBinding as fallback
+                try
+                {
+                    var secondary = binding.SecondaryInputBinding;
+                    if (secondary != null)
+                    {
+                        string path = secondary.Path;
+                        if (!string.IsNullOrEmpty(path))
+                            return FormatInputBindingPath(path);
+                    }
+                }
+                catch (System.Exception ex)
+                {
+                    Debug.Log($"[SequencedKeys] GetKeyLabel('{keyId}'): " +
+                              $"SecondaryInputBinding access failed: {ex.Message}");
+                }
+
+                // Last resort: try to extract something useful from ToString()
+                if (!string.IsNullOrEmpty(bindingStr) && bindingStr != keyId)
+                    return FormatInputBindingPath(bindingStr);
             }
-            catch
+            catch (System.Exception ex)
             {
-                // Fallback to key ID
+                Debug.Log($"[SequencedKeys] GetKeyLabel('{keyId}'): " +
+                          $"registry.Get failed: {ex.Message}");
             }
             return keyId;
+        }
+
+        /// <summary>
+        /// Converts an input binding path like "/Keyboard/q" to a display label "Q".
+        /// Handles various input formats gracefully.
+        /// </summary>
+        private static string FormatInputBindingPath(string path)
+        {
+            if (string.IsNullOrEmpty(path))
+                return "?";
+
+            // Path format is typically "/Device/key", e.g. "/Keyboard/q"
+            int lastSlash = path.LastIndexOf('/');
+            string keyName = lastSlash >= 0 ? path.Substring(lastSlash + 1) : path;
+
+            // Strip common prefixes if present
+            if (keyName.StartsWith("Key"))
+                keyName = keyName.Substring(3);
+
+            if (keyName.Length == 0)
+                return path;
+
+            // Capitalize single-letter keys
+            if (keyName.Length == 1)
+                return keyName.ToUpperInvariant();
+
+            // Title-case multi-word key names
+            return char.ToUpperInvariant(keyName[0]) + keyName.Substring(1);
         }
 
         private void Activate()
