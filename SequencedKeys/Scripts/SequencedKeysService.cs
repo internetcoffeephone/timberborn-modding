@@ -266,62 +266,82 @@ namespace SequencedKeys
                 if (binding == null)
                     return keyId;
 
-                // Try to extract a readable label from the binding.
-                // KeyBinding API may vary between Timberborn versions, so
-                // we use ToString() as a generic fallback.
-                string bindingStr = binding.ToString();
-                Debug.Log($"[SequencedKeys] GetKeyLabel('{keyId}'): binding.ToString()='{bindingStr}'");
-
-                // Try accessing PrimaryInputBinding if available
-                try
+                // Use reflection to discover InputBinding properties (logged once)
+                // and extract a readable key name via ToString() or known properties.
+                var primary = binding.PrimaryInputBinding;
+                if (primary != null)
                 {
-                    var primary = binding.PrimaryInputBinding;
-                    if (primary != null)
-                    {
-                        string path = primary.Path;
-                        Debug.Log($"[SequencedKeys] GetKeyLabel('{keyId}'): primary.Path='{path}'");
-                        if (!string.IsNullOrEmpty(path))
-                            return FormatInputBindingPath(path);
-
-                        // If Path didn't work, try ToString on the binding itself
-                        string primaryStr = primary.ToString();
-                        if (!string.IsNullOrEmpty(primaryStr))
-                            return FormatInputBindingPath(primaryStr);
-                    }
-                }
-                catch (System.Exception ex)
-                {
+                    // Log the InputBinding type's properties so we can learn the API
                     Debug.Log($"[SequencedKeys] GetKeyLabel('{keyId}'): " +
-                              $"PrimaryInputBinding access failed: {ex.Message}");
-                }
-
-                // Try SecondaryInputBinding as fallback
-                try
-                {
-                    var secondary = binding.SecondaryInputBinding;
-                    if (secondary != null)
+                              $"primary type={primary.GetType().FullName}");
+                    foreach (var prop in primary.GetType().GetProperties())
                     {
-                        string path = secondary.Path;
-                        if (!string.IsNullOrEmpty(path))
-                            return FormatInputBindingPath(path);
+                        try
+                        {
+                            var val = prop.GetValue(primary);
+                            Debug.Log($"[SequencedKeys]   primary.{prop.Name} = '{val}'");
+                        }
+                        catch { }
                     }
-                }
-                catch (System.Exception ex)
-                {
-                    Debug.Log($"[SequencedKeys] GetKeyLabel('{keyId}'): " +
-                              $"SecondaryInputBinding access failed: {ex.Message}");
+
+                    // Try to get a path-like string from the InputBinding
+                    string label = ExtractKeyNameFromBinding(primary);
+                    if (label != null)
+                        return label;
                 }
 
-                // Last resort: try to extract something useful from ToString()
-                if (!string.IsNullOrEmpty(bindingStr) && bindingStr != keyId)
-                    return FormatInputBindingPath(bindingStr);
+                var secondary = binding.SecondaryInputBinding;
+                if (secondary != null)
+                {
+                    string label = ExtractKeyNameFromBinding(secondary);
+                    if (label != null)
+                        return label;
+                }
             }
             catch (System.Exception ex)
             {
                 Debug.Log($"[SequencedKeys] GetKeyLabel('{keyId}'): " +
-                          $"registry.Get failed: {ex.Message}");
+                          $"failed: {ex.Message}");
             }
             return keyId;
+        }
+
+        /// <summary>
+        /// Tries to extract a readable key name from an InputBinding object
+        /// using reflection, since we don't know the exact property names.
+        /// Looks for properties named Path, path, EffectivePath, or falls
+        /// back to ToString().
+        /// </summary>
+        private static string ExtractKeyNameFromBinding(object inputBinding)
+        {
+            if (inputBinding == null)
+                return null;
+
+            var type = inputBinding.GetType();
+
+            // Try common property names that might contain the input path
+            string[] candidates = { "Path", "path", "EffectivePath", "Control", "DisplayName" };
+            foreach (var propName in candidates)
+            {
+                var prop = type.GetProperty(propName);
+                if (prop != null)
+                {
+                    try
+                    {
+                        var val = prop.GetValue(inputBinding)?.ToString();
+                        if (!string.IsNullOrEmpty(val))
+                            return FormatInputBindingPath(val);
+                    }
+                    catch { }
+                }
+            }
+
+            // Fallback to ToString()
+            string str = inputBinding.ToString();
+            if (!string.IsNullOrEmpty(str))
+                return FormatInputBindingPath(str);
+
+            return null;
         }
 
         /// <summary>
