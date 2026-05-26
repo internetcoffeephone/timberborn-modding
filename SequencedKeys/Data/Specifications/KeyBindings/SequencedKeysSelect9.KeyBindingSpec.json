@@ -1,0 +1,13 @@
+{
+  "KeyBindingSpec": {
+    "Id": "SequencedKeysSelect9",
+    "GroupId": "SequencedKeys",
+    "LocKey": "SequencedKeys.Select9",
+    "Order": 9,
+    "AllowOtherModifiers": false
+  },
+  "PrimaryInputBindingSpec": {
+    "Path": "/Keyboard/z",
+    "InputModifiers": "None"
+  }
+}

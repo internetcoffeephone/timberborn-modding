@@ -1,0 +1,13 @@
+{
+  "KeyBindingSpec": {
+    "Id": "SequencedKeysSelect6",
+    "GroupId": "SequencedKeys",
+    "LocKey": "SequencedKeys.Select6",
+    "Order": 6,
+    "AllowOtherModifiers": false
+  },
+  "PrimaryInputBindingSpec": {
+    "Path": "/Keyboard/s",
+    "InputModifiers": "None"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "KeyBindingSpec": {
+    "Id": "SequencedKeysCancel",
+    "GroupId": "SequencedKeys",
+    "LocKey": "SequencedKeys.Cancel",
+    "Order": 5,
+    "AllowOtherModifiers": false
+  },
+  "PrimaryInputBindingSpec": {
+    "Path": "/Keyboard/g",
+    "InputModifiers": "None"
+  }
+}
