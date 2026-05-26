@@ -1,18 +1,11 @@
 using System.Collections.Generic;
+using UnityEngine;
 using UnityEngine.UIElements;
 
 namespace SequencedKeys
 {
-    /// <summary>
-    /// Scans the UI tree for clickable toolbar buttons.
-    /// Works with both the main bottom bar and any submenus/tool-group panels
-    /// that appear when a group button is clicked.
-    /// </summary>
     public class ToolbarScanner
     {
-        /// <summary>
-        /// Represents a single clickable button found in the toolbar.
-        /// </summary>
         public class ButtonInfo
         {
             public VisualElement Root { get; }
@@ -27,94 +20,95 @@ namespace SequencedKeys
             }
         }
 
-        /// <summary>
-        /// Finds all visible, interactable tool buttons in the bottom bar area.
-        /// Looks for elements with the standard Timberborn tool button structure
-        /// (a Button named "ToolButton" inside a tool button wrapper).
-        /// </summary>
+        private bool _loggedStructure;
+
         public List<ButtonInfo> FindVisibleButtons(VisualElement searchRoot)
         {
-            var results = new List<ButtonInfo>();
-            if (searchRoot == null)
-                return results;
-
-            CollectToolButtons(searchRoot, results);
-            return results;
+            return FindVisibleButtonsInBottomBar(searchRoot);
         }
 
-        /// <summary>
-        /// Finds visible buttons in all bottom bar panels.
-        /// This searches the entire panel stack for tool button patterns.
-        /// </summary>
         public List<ButtonInfo> FindVisibleButtonsInBottomBar(VisualElement rootVisualElement)
         {
             var results = new List<ButtonInfo>();
             if (rootVisualElement == null)
                 return results;
 
-            // Look for the bottom bar container and any active tool group panels
-            var allButtons = new List<ButtonInfo>();
+            var seen = new HashSet<Button>();
 
-            // Search for tool buttons using Timberborn's naming conventions
-            CollectToolButtons(rootVisualElement, allButtons);
-
-            // Filter to only visible, enabled buttons
-            foreach (var btn in allButtons)
+            rootVisualElement.Query<Button>("ToolButton").ForEach(btn =>
             {
-                if (IsEffectivelyVisible(btn.Root) && btn.ClickableButton.enabledSelf)
+                if (seen.Add(btn) && IsEffectivelyVisible(btn) && btn.enabledSelf)
                 {
-                    results.Add(btn);
+                    var wrapper = FindButtonWrapper(btn);
+                    results.Add(new ButtonInfo(wrapper, btn, ExtractLabel(wrapper)));
+                }
+            });
+
+            rootVisualElement.Query<Button>("ToolGroupButton").ForEach(btn =>
+            {
+                if (seen.Add(btn) && IsEffectivelyVisible(btn) && btn.enabledSelf)
+                {
+                    var wrapper = FindButtonWrapper(btn);
+                    results.Add(new ButtonInfo(wrapper, btn, ExtractLabel(wrapper)));
+                }
+            });
+
+            CollectFallbackButtons(rootVisualElement, results, seen);
+
+            if (!_loggedStructure)
+            {
+                _loggedStructure = true;
+                Debug.Log($"[SequencedKeys] Scanner first scan: {results.Count} buttons.");
+                foreach (var r in results)
+                {
+                    Debug.Log($"[SequencedKeys]   btn: label='{r.Label}', " +
+                              $"root.name='{r.Root.name}', " +
+                              $"clickable.name='{r.ClickableButton.name}', " +
+                              $"classes='{GetClasses(r.Root)}'");
                 }
             }
 
             return results;
         }
 
-        private void CollectToolButtons(VisualElement element, List<ButtonInfo> results)
+        private VisualElement FindButtonWrapper(Button button)
+        {
+            var current = button.parent;
+            int depth = 0;
+            while (current != null && depth < 5)
+            {
+                if (!string.IsNullOrEmpty(current.tooltip))
+                    return current;
+                if (current.ClassListContains("tool-button") ||
+                    current.ClassListContains("tool-group-button"))
+                    return current;
+                if (current.parent != null && current.parent.childCount > 15)
+                    return current;
+                current = current.parent;
+                depth++;
+            }
+            return button.parent ?? button;
+        }
+
+        private void CollectFallbackButtons(VisualElement element, List<ButtonInfo> results,
+            HashSet<Button> seen)
         {
             if (element == null || element.resolvedStyle.display == DisplayStyle.None)
                 return;
 
-            // Check if this element IS a tool button or contains one
-            var toolButton = element.Q<Button>("ToolButton");
-            if (toolButton != null && element.ClassListContains("tool-button"))
+            if (element is Button btn && seen.Add(btn) && IsToolbarButton(btn))
             {
-                var label = ExtractLabel(element);
-                results.Add(new ButtonInfo(element, toolButton, label));
-                return; // Don't recurse into found buttons
-            }
-
-            // Also look for tool group buttons (these open sub-menus)
-            var groupButton = element.Q<Button>("ToolGroupButton");
-            if (groupButton != null && element.ClassListContains("tool-group-button"))
-            {
-                var label = ExtractLabel(element);
-                results.Add(new ButtonInfo(element, groupButton, label));
+                if (IsEffectivelyVisible(btn) && btn.enabledSelf)
+                    results.Add(new ButtonInfo(btn, btn, ExtractLabel(btn)));
                 return;
             }
 
-            // Generic fallback: any Button that is a direct interactive element
-            // in a bottom-bar-like container
-            if (element is Button btn && IsToolbarButton(btn))
-            {
-                var label = ExtractLabel(element);
-                results.Add(new ButtonInfo(element, btn, label));
-                return;
-            }
-
-            // Recurse into children
             for (int i = 0; i < element.childCount; i++)
-            {
-                CollectToolButtons(element[i], results);
-            }
+                CollectFallbackButtons(element[i], results, seen);
         }
 
         private bool IsToolbarButton(Button button)
         {
-            // Match buttons that look like toolbar entries:
-            // - Has a bottom-bar-button class, OR
-            // - Is inside a bottom-bar element, OR
-            // - Has a ToolImage child (icon-based button)
             if (button.ClassListContains("bottom-bar-button--red") ||
                 button.ClassListContains("bottom-bar-button--blue") ||
                 button.ClassListContains("bottom-bar-button--green"))
@@ -128,7 +122,6 @@ namespace SequencedKeys
 
         private string ExtractLabel(VisualElement element)
         {
-            // Try to get the tooltip first, then any text content
             if (!string.IsNullOrEmpty(element.tooltip))
                 return element.tooltip;
 
@@ -140,7 +133,6 @@ namespace SequencedKeys
             if (textEl != null && !string.IsNullOrEmpty(textEl.text))
                 return textEl.text;
 
-            // Fall back to the name
             return element.name ?? "?";
         }
 
@@ -158,6 +150,14 @@ namespace SequencedKeys
                 current = current.parent;
             }
             return true;
+        }
+
+        private static string GetClasses(VisualElement element)
+        {
+            var classes = new List<string>();
+            foreach (var cls in element.GetClasses())
+                classes.Add(cls);
+            return string.Join(" ", classes);
         }
     }
 }

@@ -176,6 +176,14 @@ namespace SequencedKeys
 
             if (_isActive)
             {
+                // Activate key toggles off
+                if (SafeIsKeyDown(_activateKeyId))
+                {
+                    Debug.Log("[SequencedKeys] Activate key pressed while active — toggling off.");
+                    Deactivate();
+                    return true;
+                }
+
                 // Cancel key
                 if (SafeIsKeyDown(_cancelKeyId))
                 {
@@ -332,123 +340,21 @@ namespace SequencedKeys
             }
         }
 
-        /// <summary>
-        /// Extracts a human-readable label from a keybinding.
-        /// Tries to get the input binding path and format it as a readable key name.
-        /// Falls back gracefully if the KeyBinding API differs from expected.
-        /// </summary>
+        private static readonly string[] SelectionKeyLabels =
+            { "Q", "W", "E", "R", "A", "S", "D", "F", "Z", "X", "C", "V" };
+
         private string GetKeyLabel(string keyId)
         {
-            try
+            if (keyId == SequencedKeysConstants.ActivateKeyId) return "B";
+            if (keyId == SequencedKeysConstants.CancelKeyId) return "G";
+            if (keyId.StartsWith(SequencedKeysConstants.SelectKeyIdPrefix))
             {
-                var binding = _keyBindingRegistry.Get(keyId);
-                if (binding == null)
-                    return keyId;
-
-                // Use reflection to discover InputBinding properties (logged once)
-                // and extract a readable key name via ToString() or known properties.
-                var primary = binding.PrimaryInputBinding;
-                if (primary != null)
-                {
-                    // Log the InputBinding type's properties so we can learn the API
-                    Debug.Log($"[SequencedKeys] GetKeyLabel('{keyId}'): " +
-                              $"primary type={primary.GetType().FullName}");
-                    foreach (var prop in primary.GetType().GetProperties())
-                    {
-                        try
-                        {
-                            var val = prop.GetValue(primary);
-                            Debug.Log($"[SequencedKeys]   primary.{prop.Name} = '{val}'");
-                        }
-                        catch { }
-                    }
-
-                    // Try to get a path-like string from the InputBinding
-                    string label = ExtractKeyNameFromBinding(primary);
-                    if (label != null)
-                        return label;
-                }
-
-                var secondary = binding.SecondaryInputBinding;
-                if (secondary != null)
-                {
-                    string label = ExtractKeyNameFromBinding(secondary);
-                    if (label != null)
-                        return label;
-                }
-            }
-            catch (System.Exception ex)
-            {
-                Debug.Log($"[SequencedKeys] GetKeyLabel('{keyId}'): " +
-                          $"failed: {ex.Message}");
+                string numPart = keyId.Substring(SequencedKeysConstants.SelectKeyIdPrefix.Length);
+                if (int.TryParse(numPart, out int index) &&
+                    index >= 1 && index <= SelectionKeyLabels.Length)
+                    return SelectionKeyLabels[index - 1];
             }
             return keyId;
-        }
-
-        /// <summary>
-        /// Tries to extract a readable key name from an InputBinding object
-        /// using reflection, since we don't know the exact property names.
-        /// Looks for properties named Path, path, EffectivePath, or falls
-        /// back to ToString().
-        /// </summary>
-        private static string ExtractKeyNameFromBinding(object inputBinding)
-        {
-            if (inputBinding == null)
-                return null;
-
-            var type = inputBinding.GetType();
-
-            // Try common property names that might contain the input path
-            string[] candidates = { "Path", "path", "EffectivePath", "Control", "DisplayName" };
-            foreach (var propName in candidates)
-            {
-                var prop = type.GetProperty(propName);
-                if (prop != null)
-                {
-                    try
-                    {
-                        var val = prop.GetValue(inputBinding)?.ToString();
-                        if (!string.IsNullOrEmpty(val))
-                            return FormatInputBindingPath(val);
-                    }
-                    catch { }
-                }
-            }
-
-            // Fallback to ToString()
-            string str = inputBinding.ToString();
-            if (!string.IsNullOrEmpty(str))
-                return FormatInputBindingPath(str);
-
-            return null;
-        }
-
-        /// <summary>
-        /// Converts an input binding path like "/Keyboard/q" to a display label "Q".
-        /// Handles various input formats gracefully.
-        /// </summary>
-        private static string FormatInputBindingPath(string path)
-        {
-            if (string.IsNullOrEmpty(path))
-                return "?";
-
-            // Path format is typically "/Device/key", e.g. "/Keyboard/q"
-            int lastSlash = path.LastIndexOf('/');
-            string keyName = lastSlash >= 0 ? path.Substring(lastSlash + 1) : path;
-
-            // Strip common prefixes if present
-            if (keyName.StartsWith("Key"))
-                keyName = keyName.Substring(3);
-
-            if (keyName.Length == 0)
-                return path;
-
-            // Capitalize single-letter keys
-            if (keyName.Length == 1)
-                return keyName.ToUpperInvariant();
-
-            // Title-case multi-word key names
-            return char.ToUpperInvariant(keyName[0]) + keyName.Substring(1);
         }
 
         private void Activate()
