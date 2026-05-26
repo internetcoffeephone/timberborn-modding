@@ -231,43 +231,23 @@ namespace SequencedKeys
             Debug.Log($"[SequencedKeys] InitializeKeyBindings: " +
                       $"activateKeyId='{_activateKeyId}', cancelKeyId='{_cancelKeyId}'");
 
-            // Try to resolve the activate key binding to verify it exists
+            // Deep-inspect one KeyBinding to discover the InputBinding API
             try
             {
                 var activateBinding = _keyBindingRegistry.Get(_activateKeyId);
-                Debug.Log($"[SequencedKeys] Activate binding found: {activateBinding}");
                 Debug.Log($"[SequencedKeys] Activate binding type: {activateBinding?.GetType().FullName}");
+                DumpObject("Activate", activateBinding, 0);
 
-                // Log available properties for debugging API shape
-                if (activateBinding != null)
+                var primary = activateBinding?.PrimaryInputBinding;
+                if (primary != null)
                 {
-                    foreach (var prop in activateBinding.GetType().GetProperties())
-                    {
-                        try
-                        {
-                            var val = prop.GetValue(activateBinding);
-                            Debug.Log($"[SequencedKeys]   Activate.{prop.Name} = {val}");
-                        }
-                        catch { }
-                    }
+                    Debug.Log($"[SequencedKeys] PrimaryInputBinding type: {primary.GetType().FullName}");
+                    DumpObject("Primary", primary, 0);
                 }
             }
             catch (System.Exception ex)
             {
-                Debug.LogError($"[SequencedKeys] FAILED to get activate key binding " +
-                               $"'{_activateKeyId}': {ex.Message}");
-            }
-
-            // Try to resolve the cancel key binding
-            try
-            {
-                var cancelBinding = _keyBindingRegistry.Get(_cancelKeyId);
-                Debug.Log($"[SequencedKeys] Cancel binding found: {cancelBinding}");
-            }
-            catch (System.Exception ex)
-            {
-                Debug.LogError($"[SequencedKeys] FAILED to get cancel key binding " +
-                               $"'{_cancelKeyId}': {ex.Message}");
+                Debug.LogError($"[SequencedKeys] Inspect failed: {ex.Message}");
             }
 
             // Discover how many selection keys are registered by probing the registry
@@ -337,6 +317,43 @@ namespace SequencedKeys
             catch (System.Collections.Generic.KeyNotFoundException)
             {
                 return false;
+            }
+        }
+
+        private static void DumpObject(string prefix, object obj, int depth)
+        {
+            if (obj == null || depth > 1) return;
+            var type = obj.GetType();
+            var indent = new string(' ', depth * 2);
+            var flags = System.Reflection.BindingFlags.Public |
+                        System.Reflection.BindingFlags.NonPublic |
+                        System.Reflection.BindingFlags.Instance;
+
+            foreach (var prop in type.GetProperties(flags))
+            {
+                try
+                {
+                    var val = prop.GetValue(obj);
+                    Debug.Log($"[SequencedKeys] {indent}{prefix}.prop.{prop.Name} " +
+                              $"({prop.PropertyType.Name}) = '{val}'");
+                    if (val != null && !prop.PropertyType.IsPrimitive &&
+                        prop.PropertyType != typeof(string) && depth == 0)
+                        DumpObject(prefix + "." + prop.Name, val, depth + 1);
+                }
+                catch { }
+            }
+            foreach (var field in type.GetFields(flags))
+            {
+                try
+                {
+                    var val = field.GetValue(obj);
+                    Debug.Log($"[SequencedKeys] {indent}{prefix}.field.{field.Name} " +
+                              $"({field.FieldType.Name}) = '{val}'");
+                    if (val != null && !field.FieldType.IsPrimitive &&
+                        field.FieldType != typeof(string) && depth == 0)
+                        DumpObject(prefix + "." + field.Name, val, depth + 1);
+                }
+                catch { }
             }
         }
 
