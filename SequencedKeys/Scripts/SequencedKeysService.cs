@@ -49,6 +49,9 @@ namespace SequencedKeys
         private int _deferredScanCountdown;
         private int _previousButtonCount;
 
+        // Whether our keybindings were found in the registry
+        private bool _keysRegistered;
+
         // Debug: throttle "ProcessInput called" logging to avoid spam
         private int _processInputCallCount;
         private bool _loggedProcessInputAlive;
@@ -69,6 +72,48 @@ namespace SequencedKeys
         public void Load()
         {
             Debug.Log("[SequencedKeys] Load() called — beginning initialization.");
+
+            // Log all registered keybinding IDs to see what the game knows about
+            try
+            {
+                Debug.Log("[SequencedKeys] Dumping KeyBindingRegistry contents...");
+                var registryType = _keyBindingRegistry.GetType();
+                foreach (var field in registryType.GetFields(
+                    System.Reflection.BindingFlags.NonPublic |
+                    System.Reflection.BindingFlags.Public |
+                    System.Reflection.BindingFlags.Instance))
+                {
+                    Debug.Log($"[SequencedKeys]   Registry field: {field.Name} " +
+                              $"(type={field.FieldType.Name})");
+                    if (field.FieldType.Name.Contains("Dictionary") ||
+                        field.FieldType.Name.Contains("IDictionary"))
+                    {
+                        try
+                        {
+                            var dict = field.GetValue(_keyBindingRegistry)
+                                as System.Collections.IDictionary;
+                            if (dict != null)
+                            {
+                                Debug.Log($"[SequencedKeys]   Dictionary has {dict.Count} entries.");
+                                int logged = 0;
+                                foreach (var key in dict.Keys)
+                                {
+                                    Debug.Log($"[SequencedKeys]     key='{key}'");
+                                    if (++logged >= 30) break;
+                                }
+                                if (dict.Count > 30)
+                                    Debug.Log($"[SequencedKeys]     ... and {dict.Count - 30} more");
+                            }
+                        }
+                        catch { }
+                    }
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Debug.Log($"[SequencedKeys] Could not dump registry: {ex.Message}");
+            }
+
             InitializeKeyBindings();
             _inputService.AddInputProcessor(this);
             Debug.Log("[SequencedKeys] Load() complete — input processor registered.");
@@ -123,10 +168,16 @@ namespace SequencedKeys
                           $"selectKeyCount={_selectKeyIds?.Length ?? 0}");
             }
 
+            if (!_keysRegistered)
+            {
+                // Keys not in the registry — nothing we can do
+                return false;
+            }
+
             if (_isActive)
             {
                 // Cancel key
-                if (_inputService.IsKeyDown(_cancelKeyId))
+                if (SafeIsKeyDown(_cancelKeyId))
                 {
                     Debug.Log("[SequencedKeys] Cancel key pressed — deactivating.");
                     Deactivate();
@@ -140,7 +191,7 @@ namespace SequencedKeys
                 // Selection keys
                 for (int i = 0; i < _selectKeyIds.Length; i++)
                 {
-                    if (_inputService.IsKeyDown(_selectKeyIds[i]))
+                    if (SafeIsKeyDown(_selectKeyIds[i]))
                     {
                         Debug.Log($"[SequencedKeys] Selection key {i} " +
                                   $"('{_selectKeyLabels[i]}') pressed.");
@@ -154,7 +205,7 @@ namespace SequencedKeys
             }
 
             // Activation key (only when not active)
-            if (_inputService.IsKeyDown(_activateKeyId))
+            if (SafeIsKeyDown(_activateKeyId))
             {
                 Debug.Log("[SequencedKeys] Activation key pressed! Activating...");
                 Activate();
@@ -248,9 +299,37 @@ namespace SequencedKeys
                 _selectKeyLabels[i] = GetKeyLabel(_selectKeyIds[i]);
             }
 
+            // Check if the activate key was actually found
+            _keysRegistered = false;
+            try
+            {
+                _keyBindingRegistry.Get(_activateKeyId);
+                _keysRegistered = true;
+            }
+            catch
+            {
+                Debug.LogError("[SequencedKeys] KEYBINDINGS NOT REGISTERED! " +
+                               "The KeyBindingSpec JSON files are not being loaded by the game. " +
+                               "Check that the Mod Builder copied them to the mod folder. " +
+                               "Expected location: <Mods>/SequencedKeys/Blueprints/KeyBindings/");
+            }
+
             Debug.Log($"[SequencedKeys] Initialization complete: " +
-                      $"{_selectKeyIds.Length} selection keys registered. " +
+                      $"keysRegistered={_keysRegistered}, " +
+                      $"{_selectKeyIds.Length} selection keys. " +
                       $"Labels: [{string.Join(", ", _selectKeyLabels)}]");
+        }
+
+        private bool SafeIsKeyDown(string keyId)
+        {
+            try
+            {
+                return _inputService.IsKeyDown(keyId);
+            }
+            catch (System.Collections.Generic.KeyNotFoundException)
+            {
+                return false;
+            }
         }
 
         /// <summary>
