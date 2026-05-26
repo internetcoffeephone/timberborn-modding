@@ -1,7 +1,0 @@
-{
-  "KeyBindingGroupSpec": {
-    "Id": "SequencedKeys",
-    "Order": 110,
-    "LocKey": "SequencedKeys.KeyBindingGroup"
-  }
-}
