@@ -55,8 +55,8 @@ mkdir -p "$MOD_DEST"
 
 cp "$DLL_PATH" "$MOD_DEST/"
 cp "$SCRIPT_DIR/manifest.json" "$MOD_DEST/"
-cp -r "$SCRIPT_DIR/Blueprints" "$MOD_DEST/"
-cp -r "$SCRIPT_DIR/Localizations" "$MOD_DEST/"
+cp -r "$SCRIPT_DIR/Data/Blueprints" "$MOD_DEST/"
+cp -r "$SCRIPT_DIR/Data/Localizations" "$MOD_DEST/"
 
 echo ""
 echo "Done! Installed $MOD_NAME to $MOD_DEST"
