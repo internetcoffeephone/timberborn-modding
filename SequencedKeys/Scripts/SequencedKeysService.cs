@@ -18,8 +18,10 @@ namespace SequencedKeys
         private SequencedKeysOverlay _overlay;
 
         private string _activateKeyId;
-        private string[] _selectKeyIds;
-        private string[] _selectKeyLabels;
+        private string[] _registeredKeyIds;
+
+        private string[] _boundKeyIds;
+        private string[] _boundKeyLabels;
 
         private bool _isActive;
         private bool _showingCategories;
@@ -54,7 +56,7 @@ namespace SequencedKeys
         public void Load()
         {
             Debug.Log("[SequencedKeys] Load() called.");
-            InitializeKeyBindings();
+            DiscoverRegisteredKeys();
             _inputService.AddInputProcessor(this);
             Debug.Log("[SequencedKeys] Load() complete — input processor registered.");
         }
@@ -90,7 +92,7 @@ namespace SequencedKeys
                 _loggedProcessInputAlive = true;
                 Debug.Log($"[SequencedKeys] ProcessInput() alive — " +
                           $"isActive={_isActive}, uiRoot={_uiRoot != null}, " +
-                          $"keys={_selectKeyIds?.Length ?? 0}");
+                          $"registered={_registeredKeyIds?.Length ?? 0}");
             }
 
             if (!_keysRegistered)
@@ -118,27 +120,27 @@ namespace SequencedKeys
                         _heldKeyIndex = -1;
                         _heldControl = null;
                         _overlay?.ClearHighlight();
-                        Debug.Log($"[SequencedKeys] Key released: {_selectKeyLabels[idx]} → selecting group {idx}.");
+                        Debug.Log($"[SequencedKeys] Key released: {_boundKeyLabels[idx]} → selecting group {idx}.");
                         OnSelectionKeyPressed(idx);
                     }
                     return true;
                 }
 
-                for (int i = 0; i < _selectKeyIds.Length; i++)
+                for (int i = 0; i < _boundKeyIds.Length; i++)
                 {
-                    if (SafeIsKeyDown(_selectKeyIds[i]))
+                    if (SafeIsKeyDown(_boundKeyIds[i]))
                     {
                         _heldKeyIndex = i;
-                        _heldControl = GetInputControl(_selectKeyIds[i]);
+                        _heldControl = GetInputControl(_boundKeyIds[i]);
                         _overlay?.HighlightGroup(i);
 
                         if (_heldControl != null)
                         {
-                            Debug.Log($"[SequencedKeys] Key down: {_selectKeyLabels[i]} — holding for release.");
+                            Debug.Log($"[SequencedKeys] Key down: {_boundKeyLabels[i]} — holding for release.");
                         }
                         else
                         {
-                            Debug.Log($"[SequencedKeys] Key down: {_selectKeyLabels[i]} — no InputControl, selecting immediately.");
+                            Debug.Log($"[SequencedKeys] Key down: {_boundKeyLabels[i]} — no InputControl, selecting immediately.");
                             _heldKeyIndex = -1;
                             _overlay?.ClearHighlight();
                             OnSelectionKeyPressed(i);
@@ -160,18 +162,18 @@ namespace SequencedKeys
             return false;
         }
 
-        private void InitializeKeyBindings()
+        private void DiscoverRegisteredKeys()
         {
             _activateKeyId = SequencedKeysConstants.ActivateKeyId;
 
-            var selectKeys = new List<string>();
+            var keys = new List<string>();
             for (int i = 1; i <= 26; i++)
             {
                 var keyId = SequencedKeysConstants.SelectKeyIdPrefix + i;
                 try
                 {
                     if (_keyBindingRegistry.Get(keyId) != null)
-                        selectKeys.Add(keyId);
+                        keys.Add(keyId);
                 }
                 catch
                 {
@@ -179,10 +181,9 @@ namespace SequencedKeys
                 }
             }
 
-            _selectKeyIds = selectKeys.ToArray();
-            _selectKeyLabels = new string[_selectKeyIds.Length];
-            for (int i = 0; i < _selectKeyIds.Length; i++)
-                _selectKeyLabels[i] = GetKeyLabel(_selectKeyIds[i]);
+            _registeredKeyIds = keys.ToArray();
+            _boundKeyIds = new string[0];
+            _boundKeyLabels = new string[0];
 
             _keysRegistered = false;
             try
@@ -192,12 +193,43 @@ namespace SequencedKeys
             }
             catch
             {
-                Debug.LogError("[SequencedKeys] Keybindings not found in registry.");
+                Debug.LogError("[SequencedKeys] Activate keybinding not found in registry.");
             }
 
-            Debug.Log($"[SequencedKeys] Init: registered={_keysRegistered}, " +
-                      $"{_selectKeyIds.Length} selection keys, " +
-                      $"labels=[{string.Join(", ", _selectKeyLabels)}]");
+            Debug.Log($"[SequencedKeys] DiscoverRegisteredKeys: activate={_keysRegistered}, " +
+                      $"{_registeredKeyIds.Length} selection key slots.");
+        }
+
+        private void RefreshBoundKeys()
+        {
+            var ids = new List<string>();
+            var labels = new List<string>();
+
+            for (int i = 0; i < _registeredKeyIds.Length; i++)
+            {
+                var keyId = _registeredKeyIds[i];
+                try
+                {
+                    var binding = _keyBindingRegistry.Get(keyId);
+                    var primary = binding?.PrimaryInputBinding;
+                    if (primary != null && primary.IsDefined)
+                    {
+                        ids.Add(keyId);
+                        var displayName = primary.InputControl?.displayName;
+                        if (!string.IsNullOrEmpty(displayName))
+                            labels.Add(displayName);
+                        else
+                            labels.Add(GetFallbackLabel(keyId));
+                    }
+                }
+                catch { }
+            }
+
+            _boundKeyIds = ids.ToArray();
+            _boundKeyLabels = labels.ToArray();
+
+            Debug.Log($"[SequencedKeys] RefreshBoundKeys: {_boundKeyIds.Length}/{_registeredKeyIds.Length} bound, " +
+                      $"labels=[{string.Join(", ", _boundKeyLabels)}]");
         }
 
         private bool SafeIsKeyDown(string keyId)
@@ -222,25 +254,8 @@ namespace SequencedKeys
         private static readonly string[] DefaultKeyLabels =
             { "Q", "W", "E", "R", "A", "S", "D", "F", "Z", "X", "C", "V" };
 
-        private string GetKeyLabel(string keyId)
+        private string GetFallbackLabel(string keyId)
         {
-            try
-            {
-                var binding = _keyBindingRegistry.Get(keyId);
-                var primary = binding?.PrimaryInputBinding;
-                if (primary != null && primary.IsDefined)
-                {
-                    var control = primary.InputControl;
-                    if (control != null)
-                    {
-                        var displayName = control.displayName;
-                        if (!string.IsNullOrEmpty(displayName))
-                            return displayName;
-                    }
-                }
-            }
-            catch { }
-
             if (keyId.StartsWith(SequencedKeysConstants.SelectKeyIdPrefix))
             {
                 string numPart = keyId.Substring(SequencedKeysConstants.SelectKeyIdPrefix.Length);
@@ -258,13 +273,43 @@ namespace SequencedKeys
                 return;
             }
 
+            RefreshBoundKeys();
+
             _isActive = true;
             _showingCategories = true;
             _heldKeyIndex = -1;
             _heldControl = null;
             _breadcrumb = "SEQUENCED KEYS";
             _deferredScanCountdown = 0;
+
+            if (_boundKeyIds.Length < SequencedKeysConstants.MinSelectionKeys)
+            {
+                Debug.LogWarning($"[SequencedKeys] Only {_boundKeyIds.Length} key(s) bound " +
+                                 $"(min {SequencedKeysConstants.MinSelectionKeys}). Cannot subdivide.");
+                var activateLabel = GetActivateLabel();
+                _overlay?.ShowStatusBar(
+                    $"SEQUENCED KEYS — bind at least {SequencedKeysConstants.MinSelectionKeys} selection keys  |  " +
+                    activateLabel + " to close");
+                return;
+            }
+
             ScanAndShow();
+        }
+
+        private string GetActivateLabel()
+        {
+            try
+            {
+                var binding = _keyBindingRegistry.Get(_activateKeyId);
+                var primary = binding?.PrimaryInputBinding;
+                if (primary != null && primary.IsDefined)
+                {
+                    var dn = primary.InputControl?.displayName;
+                    if (!string.IsNullOrEmpty(dn)) return dn;
+                }
+            }
+            catch { }
+            return "B";
         }
 
         private void Deactivate()
@@ -304,7 +349,7 @@ namespace SequencedKeys
                     if (_currentButtons.Count == 0)
                     {
                         _overlay?.Hide();
-                        var activateLabel = GetKeyLabel(_activateKeyId);
+                        var activateLabel = GetActivateLabel();
                         _overlay?.ShowStatusBar(_breadcrumb + " (no buttons)  |  " + activateLabel + " to close");
                         return;
                     }
@@ -345,7 +390,7 @@ namespace SequencedKeys
 
         private void SubdivideAndShow()
         {
-            int keyCount = _selectKeyIds.Length;
+            int keyCount = _boundKeyIds.Length;
             int buttonCount = _currentButtons.Count;
 
             _currentGroups = new List<List<ToolbarScanner.ButtonInfo>>();
@@ -370,9 +415,9 @@ namespace SequencedKeys
                 }
             }
 
-            _overlay?.ShowHints(_currentGroups, _selectKeyLabels);
+            _overlay?.ShowHints(_currentGroups, _boundKeyLabels);
 
-            var activateLabel = GetKeyLabel(_activateKeyId);
+            var activateLabel = GetActivateLabel();
             _overlay?.ShowStatusBar(_breadcrumb + "  |  " + activateLabel + " to close");
         }
 
@@ -390,7 +435,7 @@ namespace SequencedKeys
 
             if (selectedGroup.Count == 1)
             {
-                Debug.Log($"[SequencedKeys] Selected [{_selectKeyLabels[keyIndex]}] → " +
+                Debug.Log($"[SequencedKeys] Selected [{_boundKeyLabels[keyIndex]}] → " +
                           $"clicking '{selectedGroup[0].Label}'.");
                 ClickButton(selectedGroup[0]);
             }
@@ -402,10 +447,10 @@ namespace SequencedKeys
                     if (i > 0) sb.Append(", ");
                     sb.Append('"').Append(selectedGroup[i].Label).Append('"');
                 }
-                Debug.Log($"[SequencedKeys] Selected [{_selectKeyLabels[keyIndex]}] → " +
+                Debug.Log($"[SequencedKeys] Selected [{_boundKeyLabels[keyIndex]}] → " +
                           $"subdividing {selectedGroup.Count} buttons: [{sb}].");
 
-                _breadcrumb += " > " + _selectKeyLabels[keyIndex];
+                _breadcrumb += " > " + _boundKeyLabels[keyIndex];
                 _currentButtons = selectedGroup;
                 SubdivideAndShow();
             }
