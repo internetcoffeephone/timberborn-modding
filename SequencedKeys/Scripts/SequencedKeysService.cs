@@ -20,6 +20,7 @@ namespace SequencedKeys
         private string[] _selectKeyLabels;
 
         private bool _isActive;
+        private bool _showingCategories;
         private List<ToolbarScanner.ButtonInfo> _currentButtons;
         private List<List<ToolbarScanner.ButtonInfo>> _currentGroups;
         private string _breadcrumb;
@@ -27,7 +28,6 @@ namespace SequencedKeys
         private VisualElement _uiRoot;
 
         private int _deferredScanCountdown;
-        private int _previousButtonCount;
 
         private bool _keysRegistered;
 
@@ -209,9 +209,10 @@ namespace SequencedKeys
             }
 
             _isActive = true;
+            _showingCategories = true;
             _breadcrumb = "SEQUENCED KEYS";
             _deferredScanCountdown = 0;
-            ScanAndSubdivide();
+            ScanAndShow();
         }
 
         private void Deactivate()
@@ -224,20 +225,38 @@ namespace SequencedKeys
             _overlay?.Hide();
         }
 
-        private void ScanAndSubdivide()
+        private void ScanAndShow()
         {
             if (_uiRoot == null)
                 return;
 
-            _currentButtons = _toolbarScanner.FindVisibleButtonsInBottomBar(_uiRoot);
-            Debug.Log($"[SequencedKeys] Scan found {_currentButtons.Count} button(s).");
+            _currentButtons = _showingCategories
+                ? _toolbarScanner.ScanCategories(_uiRoot)
+                : _toolbarScanner.ScanToolButtons(_uiRoot);
+
+            Debug.Log($"[SequencedKeys] ScanAndShow: showingCategories={_showingCategories}, " +
+                      $"found {_currentButtons.Count} button(s).");
 
             if (_currentButtons.Count == 0)
             {
-                _overlay?.Hide();
-                var activateLabel = GetKeyLabel(_activateKeyId);
-                _overlay?.ShowStatusBar(_breadcrumb + " (no buttons)  |  " + activateLabel + " to close");
-                return;
+                if (_showingCategories)
+                {
+                    _showingCategories = false;
+                    _currentButtons = _toolbarScanner.ScanToolButtons(_uiRoot);
+                    Debug.Log($"[SequencedKeys] No categories found, falling back to tools: {_currentButtons.Count}.");
+                    if (_currentButtons.Count == 0)
+                    {
+                        _overlay?.Hide();
+                        var activateLabel = GetKeyLabel(_activateKeyId);
+                        _overlay?.ShowStatusBar(_breadcrumb + " (no buttons)  |  " + activateLabel + " to close");
+                        return;
+                    }
+                }
+                else
+                {
+                    Deactivate();
+                    return;
+                }
             }
 
             if (_currentButtons.Count == 1)
@@ -308,7 +327,7 @@ namespace SequencedKeys
             _breadcrumb += " > " + buttonInfo.Label;
             _overlay?.Hide();
 
-            _previousButtonCount = _toolbarScanner.FindVisibleButtonsInBottomBar(_uiRoot).Count;
+            Debug.Log($"[SequencedKeys] ClickButton: '{buttonInfo.Label}', showingCategories={_showingCategories}");
 
             var button = buttonInfo.ClickableButton;
             using (var clickEvt = ClickEvent.GetPooled())
@@ -317,7 +336,10 @@ namespace SequencedKeys
                 button.SendEvent(clickEvt);
             }
 
-            _deferredScanCountdown = 5;
+            if (_showingCategories)
+                _deferredScanCountdown = 5;
+            else
+                Deactivate();
         }
 
         private void RescanAfterClick()
@@ -325,17 +347,8 @@ namespace SequencedKeys
             if (!_isActive || _uiRoot == null)
                 return;
 
-            var newButtons = _toolbarScanner.FindVisibleButtonsInBottomBar(_uiRoot);
-
-            if (newButtons.Count > 0 && newButtons.Count != _previousButtonCount)
-            {
-                _currentButtons = newButtons;
-                SubdivideAndShow();
-            }
-            else
-            {
-                Deactivate();
-            }
+            _showingCategories = false;
+            ScanAndShow();
         }
     }
 }

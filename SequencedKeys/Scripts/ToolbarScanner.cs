@@ -22,21 +22,50 @@ namespace SequencedKeys
 
         private bool _loggedStructure;
 
-        public List<ButtonInfo> FindVisibleButtons(VisualElement searchRoot)
+        public List<ButtonInfo> ScanCategories(VisualElement rootVisualElement)
         {
-            return FindVisibleButtonsInBottomBar(searchRoot);
+            var bottomBar = FindBottomBar(rootVisualElement);
+            if (bottomBar == null)
+                return new List<ButtonInfo>();
+
+            var toolPanel = bottomBar.Q("ToolPanel");
+            if (toolPanel == null && bottomBar.childCount > 0)
+                toolPanel = bottomBar[0];
+            if (toolPanel == null)
+                return new List<ButtonInfo>();
+
+            var results = ScanElement(toolPanel);
+            Debug.Log($"[SequencedKeys] ScanCategories: found {results.Count} in '{toolPanel.name}'.");
+            return results;
         }
 
-        public List<ButtonInfo> FindVisibleButtonsInBottomBar(VisualElement rootVisualElement)
+        public List<ButtonInfo> ScanToolButtons(VisualElement rootVisualElement)
+        {
+            var bottomBar = FindBottomBar(rootVisualElement);
+            if (bottomBar == null)
+                return new List<ButtonInfo>();
+
+            var toolArea = bottomBar.Q("BottomBar");
+            if (toolArea == null && bottomBar.childCount > 1)
+                toolArea = bottomBar[1];
+            if (toolArea == null)
+                return new List<ButtonInfo>();
+
+            var results = ScanElement(toolArea);
+            Debug.Log($"[SequencedKeys] ScanToolButtons: found {results.Count} in '{toolArea.name}'.");
+            return results;
+        }
+
+        private VisualElement FindBottomBar(VisualElement rootVisualElement)
         {
             if (rootVisualElement == null)
-                return new List<ButtonInfo>();
+                return null;
 
             var bottomBar = rootVisualElement.Q("Bottom-bar");
             if (bottomBar == null)
             {
-                Debug.Log("[SequencedKeys] Bottom-bar not found, scanning from root.");
-                return ScanElement(rootVisualElement);
+                Debug.Log("[SequencedKeys] Bottom-bar not found.");
+                return null;
             }
 
             if (!_loggedStructure)
@@ -52,28 +81,7 @@ namespace SequencedKeys
                 }
             }
 
-            // Scan children of Bottom-bar in reverse order.
-            // The last visible child with tool buttons is the active submenu.
-            for (int i = bottomBar.childCount - 1; i >= 1; i--)
-            {
-                var child = bottomBar[i];
-                if (child.resolvedStyle.display == DisplayStyle.None)
-                    continue;
-
-                var submenuButtons = ScanElement(child);
-                if (submenuButtons.Count > 0)
-                {
-                    Debug.Log($"[SequencedKeys] Using submenu panel (child[{i}]) " +
-                              $"with {submenuButtons.Count} buttons.");
-                    return submenuButtons;
-                }
-            }
-
-            // No submenu — scan the first child (main toolbar)
-            if (bottomBar.childCount > 0)
-                return ScanElement(bottomBar[0]);
-
-            return ScanElement(bottomBar);
+            return bottomBar;
         }
 
         private List<ButtonInfo> ScanElement(VisualElement searchRoot)
@@ -101,6 +109,15 @@ namespace SequencedKeys
                     if (label != "Tooltip" && label != "Options")
                         results.Add(new ButtonInfo(wrapper, btn, label));
                 }
+            });
+
+            results.Sort((a, b) =>
+            {
+                float ax = a.Root.worldBound.x;
+                float bx = b.Root.worldBound.x;
+                if (float.IsNaN(ax) || float.IsNaN(bx))
+                    return 0;
+                return ax.CompareTo(bx);
             });
 
             return results;
