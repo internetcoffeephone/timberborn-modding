@@ -24,39 +24,27 @@ namespace SequencedKeys
 
         public List<ButtonInfo> ScanCategories(VisualElement rootVisualElement)
         {
-            var bottomBar = FindBottomBar(rootVisualElement);
-            if (bottomBar == null)
+            var target = FindScanTarget(rootVisualElement);
+            if (target == null)
                 return new List<ButtonInfo>();
 
-            var toolPanel = bottomBar.Q("ToolPanel");
-            if (toolPanel == null && bottomBar.childCount > 0)
-                toolPanel = bottomBar[0];
-            if (toolPanel == null)
-                return new List<ButtonInfo>();
-
-            var results = ScanElement(toolPanel);
-            Debug.Log($"[SequencedKeys] ScanCategories: found {results.Count} in '{toolPanel.name}'.");
+            var results = ScanByButtonName(target, "ToolGroupButton");
+            Debug.Log($"[SequencedKeys] ScanCategories: found {results.Count} ToolGroupButton(s).");
             return results;
         }
 
         public List<ButtonInfo> ScanToolButtons(VisualElement rootVisualElement)
         {
-            var bottomBar = FindBottomBar(rootVisualElement);
-            if (bottomBar == null)
+            var target = FindScanTarget(rootVisualElement);
+            if (target == null)
                 return new List<ButtonInfo>();
 
-            var toolArea = bottomBar.Q("BottomBar");
-            if (toolArea == null && bottomBar.childCount > 1)
-                toolArea = bottomBar[1];
-            if (toolArea == null)
-                return new List<ButtonInfo>();
-
-            var results = ScanElement(toolArea);
-            Debug.Log($"[SequencedKeys] ScanToolButtons: found {results.Count} in '{toolArea.name}'.");
+            var results = ScanByButtonName(target, "ToolButton");
+            Debug.Log($"[SequencedKeys] ScanToolButtons: found {results.Count} ToolButton(s).");
             return results;
         }
 
-        private VisualElement FindBottomBar(VisualElement rootVisualElement)
+        private VisualElement FindScanTarget(VisualElement rootVisualElement)
         {
             if (rootVisualElement == null)
                 return null;
@@ -81,26 +69,18 @@ namespace SequencedKeys
                 }
             }
 
+            var inner = bottomBar.Q("BottomBar");
+            if (inner != null) return inner;
+            if (bottomBar.childCount > 1) return bottomBar[1];
             return bottomBar;
         }
 
-        private List<ButtonInfo> ScanElement(VisualElement searchRoot)
+        private List<ButtonInfo> ScanByButtonName(VisualElement searchRoot, string buttonName)
         {
             var results = new List<ButtonInfo>();
             var seen = new HashSet<Button>();
 
-            searchRoot.Query<Button>("ToolGroupButton").ForEach(btn =>
-            {
-                if (seen.Add(btn) && IsEffectivelyVisible(btn) && btn.enabledSelf)
-                {
-                    var wrapper = FindButtonWrapper(btn);
-                    var label = ExtractLabel(btn, wrapper);
-                    if (label != "Tooltip" && label != "Options")
-                        results.Add(new ButtonInfo(wrapper, btn, label));
-                }
-            });
-
-            searchRoot.Query<Button>("ToolButton").ForEach(btn =>
+            searchRoot.Query<Button>(buttonName).ForEach(btn =>
             {
                 if (seen.Add(btn) && IsEffectivelyVisible(btn) && btn.enabledSelf)
                 {
@@ -151,15 +131,32 @@ namespace SequencedKeys
             if (wrapper != button && !string.IsNullOrEmpty(wrapper.tooltip))
                 return wrapper.tooltip;
 
-            var label = wrapper.Q<Label>();
+            var current = button.parent;
+            for (int d = 0; d < 6 && current != null; d++)
+            {
+                if (!string.IsNullOrEmpty(current.tooltip))
+                    return current.tooltip;
+                if (current.childCount > 10)
+                    break;
+                current = current.parent;
+            }
+
+            var label = button.Q<Label>();
             if (label != null && !string.IsNullOrEmpty(label.text))
                 return label.text;
 
-            var textEl = wrapper.Q<TextElement>();
-            if (textEl != null && !string.IsNullOrEmpty(textEl.text))
-                return textEl.text;
+            if (wrapper != button)
+            {
+                label = wrapper.Q<Label>();
+                if (label != null && !string.IsNullOrEmpty(label.text))
+                    return label.text;
 
-            return wrapper.name ?? "?";
+                var textEl = wrapper.Q<TextElement>();
+                if (textEl != null && !string.IsNullOrEmpty(textEl.text))
+                    return textEl.text;
+            }
+
+            return button.name ?? wrapper.name ?? "?";
         }
 
         private bool IsEffectivelyVisible(VisualElement element)

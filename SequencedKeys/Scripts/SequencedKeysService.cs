@@ -328,17 +328,19 @@ namespace SequencedKeys
         private void LogButtonList(List<ToolbarScanner.ButtonInfo> buttons)
         {
             if (buttons.Count == 0) return;
-            var sb = new StringBuilder();
-            sb.Append("[SequencedKeys]   Buttons: ");
-            int limit = buttons.Count > 15 ? 15 : buttons.Count;
-            for (int i = 0; i < limit; i++)
+            for (int i = 0; i < buttons.Count; i += 10)
             {
-                if (i > 0) sb.Append(", ");
-                sb.Append('"').Append(buttons[i].Label).Append('"');
+                var sb = new StringBuilder();
+                int end = System.Math.Min(i + 10, buttons.Count);
+                sb.Append($"[SequencedKeys]   [{i}-{end - 1}]: ");
+                for (int j = i; j < end; j++)
+                {
+                    if (j > i) sb.Append(", ");
+                    sb.Append('"').Append(buttons[j].Label).Append("\" (");
+                    sb.Append(buttons[j].ClickableButton.name).Append(')');
+                }
+                Debug.Log(sb.ToString());
             }
-            if (buttons.Count > 15)
-                sb.Append($", ... +{buttons.Count - 15} more");
-            Debug.Log(sb.ToString());
         }
 
         private void SubdivideAndShow()
