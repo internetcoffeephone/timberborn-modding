@@ -29,44 +29,79 @@ namespace SequencedKeys
 
         public List<ButtonInfo> FindVisibleButtonsInBottomBar(VisualElement rootVisualElement)
         {
-            var results = new List<ButtonInfo>();
             if (rootVisualElement == null)
-                return results;
+                return new List<ButtonInfo>();
 
-            var seen = new HashSet<Button>();
-
-            rootVisualElement.Query<Button>("ToolButton").ForEach(btn =>
+            var bottomBar = rootVisualElement.Q("Bottom-bar");
+            if (bottomBar == null)
             {
-                if (seen.Add(btn) && IsEffectivelyVisible(btn) && btn.enabledSelf)
-                {
-                    var wrapper = FindButtonWrapper(btn);
-                    results.Add(new ButtonInfo(wrapper, btn, ExtractLabel(wrapper)));
-                }
-            });
-
-            rootVisualElement.Query<Button>("ToolGroupButton").ForEach(btn =>
-            {
-                if (seen.Add(btn) && IsEffectivelyVisible(btn) && btn.enabledSelf)
-                {
-                    var wrapper = FindButtonWrapper(btn);
-                    results.Add(new ButtonInfo(wrapper, btn, ExtractLabel(wrapper)));
-                }
-            });
-
-            CollectFallbackButtons(rootVisualElement, results, seen);
+                Debug.Log("[SequencedKeys] Bottom-bar not found, scanning from root.");
+                return ScanElement(rootVisualElement);
+            }
 
             if (!_loggedStructure)
             {
                 _loggedStructure = true;
-                Debug.Log($"[SequencedKeys] Scanner first scan: {results.Count} buttons.");
-                foreach (var r in results)
+                Debug.Log($"[SequencedKeys] Bottom-bar has {bottomBar.childCount} children.");
+                for (int i = 0; i < bottomBar.childCount; i++)
                 {
-                    Debug.Log($"[SequencedKeys]   btn: label='{r.Label}', " +
-                              $"root.name='{r.Root.name}', " +
-                              $"clickable.name='{r.ClickableButton.name}', " +
-                              $"classes='{GetClasses(r.Root)}'");
+                    var child = bottomBar[i];
+                    Debug.Log($"[SequencedKeys]   Bottom-bar child[{i}]: name='{child.name}', " +
+                              $"type={child.GetType().Name}, children={child.childCount}, " +
+                              $"visible={child.resolvedStyle.display != DisplayStyle.None}");
                 }
             }
+
+            // Scan children of Bottom-bar in reverse order.
+            // The last visible child with tool buttons is the active submenu.
+            for (int i = bottomBar.childCount - 1; i >= 1; i--)
+            {
+                var child = bottomBar[i];
+                if (child.resolvedStyle.display == DisplayStyle.None)
+                    continue;
+
+                var submenuButtons = ScanElement(child);
+                if (submenuButtons.Count > 0)
+                {
+                    Debug.Log($"[SequencedKeys] Using submenu panel (child[{i}]) " +
+                              $"with {submenuButtons.Count} buttons.");
+                    return submenuButtons;
+                }
+            }
+
+            // No submenu — scan the first child (main toolbar)
+            if (bottomBar.childCount > 0)
+                return ScanElement(bottomBar[0]);
+
+            return ScanElement(bottomBar);
+        }
+
+        private List<ButtonInfo> ScanElement(VisualElement searchRoot)
+        {
+            var results = new List<ButtonInfo>();
+            var seen = new HashSet<Button>();
+
+            searchRoot.Query<Button>("ToolGroupButton").ForEach(btn =>
+            {
+                if (seen.Add(btn) && IsEffectivelyVisible(btn) && btn.enabledSelf)
+                {
+                    var wrapper = FindButtonWrapper(btn);
+                    var label = ExtractLabel(btn, wrapper);
+                    if (label != "Tooltip" && label != "Options")
+                        results.Add(new ButtonInfo(wrapper, btn, label));
+                }
+            });
+
+            searchRoot.Query<Button>("ToolButton").ForEach(btn =>
+            {
+                if (seen.Add(btn) && IsEffectivelyVisible(btn) && btn.enabledSelf)
+                {
+                    var wrapper = FindButtonWrapper(btn);
+                    var label = ExtractLabel(btn, wrapper);
+                    if (label != "Tooltip" && label != "Options")
+                        results.Add(new ButtonInfo(wrapper, btn, label));
+                }
+            });
 
             return results;
         }
@@ -80,7 +115,8 @@ namespace SequencedKeys
                 if (!string.IsNullOrEmpty(current.tooltip))
                     return current;
                 if (current.ClassListContains("tool-button") ||
-                    current.ClassListContains("tool-group-button"))
+                    current.ClassListContains("tool-group-button") ||
+                    current.ClassListContains("tool-group"))
                     return current;
                 if (current.parent != null && current.parent.childCount > 15)
                     return current;
@@ -90,50 +126,23 @@ namespace SequencedKeys
             return button.parent ?? button;
         }
 
-        private void CollectFallbackButtons(VisualElement element, List<ButtonInfo> results,
-            HashSet<Button> seen)
+        private string ExtractLabel(Button button, VisualElement wrapper)
         {
-            if (element == null || element.resolvedStyle.display == DisplayStyle.None)
-                return;
+            if (!string.IsNullOrEmpty(button.tooltip))
+                return button.tooltip;
 
-            if (element is Button btn && seen.Add(btn) && IsToolbarButton(btn))
-            {
-                if (IsEffectivelyVisible(btn) && btn.enabledSelf)
-                    results.Add(new ButtonInfo(btn, btn, ExtractLabel(btn)));
-                return;
-            }
+            if (wrapper != button && !string.IsNullOrEmpty(wrapper.tooltip))
+                return wrapper.tooltip;
 
-            for (int i = 0; i < element.childCount; i++)
-                CollectFallbackButtons(element[i], results, seen);
-        }
-
-        private bool IsToolbarButton(Button button)
-        {
-            if (button.ClassListContains("bottom-bar-button--red") ||
-                button.ClassListContains("bottom-bar-button--blue") ||
-                button.ClassListContains("bottom-bar-button--green"))
-                return true;
-
-            if (button.Q("ToolImage") != null)
-                return true;
-
-            return false;
-        }
-
-        private string ExtractLabel(VisualElement element)
-        {
-            if (!string.IsNullOrEmpty(element.tooltip))
-                return element.tooltip;
-
-            var label = element.Q<Label>();
+            var label = wrapper.Q<Label>();
             if (label != null && !string.IsNullOrEmpty(label.text))
                 return label.text;
 
-            var textEl = element.Q<TextElement>();
+            var textEl = wrapper.Q<TextElement>();
             if (textEl != null && !string.IsNullOrEmpty(textEl.text))
                 return textEl.text;
 
-            return element.name ?? "?";
+            return wrapper.name ?? "?";
         }
 
         private bool IsEffectivelyVisible(VisualElement element)
@@ -150,14 +159,6 @@ namespace SequencedKeys
                 current = current.parent;
             }
             return true;
-        }
-
-        private static string GetClasses(VisualElement element)
-        {
-            var classes = new List<string>();
-            foreach (var cls in element.GetClasses())
-                classes.Add(cls);
-            return string.Join(" ", classes);
         }
     }
 }

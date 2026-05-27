@@ -66,7 +66,7 @@ namespace SequencedKeys
                 _statusBar = new VisualElement();
                 _statusBar.name = "SequencedKeysStatusBar";
                 _statusBar.style.position = Position.Absolute;
-                _statusBar.style.bottom = 0;
+                _statusBar.style.top = 0;
                 _statusBar.style.left = new Length(50, LengthUnit.Percent);
                 _statusBar.style.translate =
                     new StyleTranslate(new Translate(new Length(-50, LengthUnit.Percent), 0));
@@ -75,8 +75,8 @@ namespace SequencedKeys
                 _statusBar.style.paddingRight = 12;
                 _statusBar.style.paddingTop = 6;
                 _statusBar.style.paddingBottom = 6;
-                _statusBar.style.borderTopLeftRadius = 6;
-                _statusBar.style.borderTopRightRadius = 6;
+                _statusBar.style.borderBottomLeftRadius = 6;
+                _statusBar.style.borderBottomRightRadius = 6;
                 _statusBar.style.flexDirection = FlexDirection.Row;
                 _statusBar.style.alignItems = Align.Center;
 

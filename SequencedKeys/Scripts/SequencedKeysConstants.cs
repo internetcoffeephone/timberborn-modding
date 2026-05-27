@@ -6,7 +6,7 @@ namespace SequencedKeys
     public static class SequencedKeysConstants
     {
         public const string ActivateKeyId = "SequencedKeysActivate";
-        public const string CancelKeyId = "SequencedKeysCancel";
+
         public const string SelectKeyIdPrefix = "SequencedKeysSelect";
 
         /// <summary>
