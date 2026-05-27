@@ -1,24 +1,21 @@
-using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UIElements;
 
 namespace SequencedKeys
 {
-    /// <summary>
-    /// Manages the visual overlay that shows key hints on toolbar buttons
-    /// during sequenced key navigation.
-    /// </summary>
     public class SequencedKeysOverlay
     {
         private readonly VisualElement _rootVisualElement;
         private VisualElement _overlayContainer;
-        private readonly List<VisualElement> _activeHints = new List<VisualElement>();
+        private readonly List<List<VisualElement>> _hintsByGroup = new List<List<VisualElement>>();
         private VisualElement _statusBar;
         private Label _statusLabel;
 
         private static readonly Color HintBackgroundColor = new Color(0.1f, 0.1f, 0.1f, 0.85f);
         private static readonly Color HintTextColor = new Color(1f, 0.9f, 0.2f, 1f);
+        private static readonly Color HintHighlightBg = new Color(0.15f, 0.45f, 0.1f, 0.92f);
+        private static readonly Color HintHighlightBorder = new Color(0.3f, 0.9f, 0.2f, 1f);
         private static readonly Color StatusBackgroundColor = new Color(0.05f, 0.05f, 0.15f, 0.9f);
         private static readonly Color StatusTextColor = new Color(0.8f, 0.9f, 1f, 1f);
         private static readonly Color StatusActiveColor = new Color(0.2f, 0.8f, 0.4f, 1f);
@@ -28,11 +25,6 @@ namespace SequencedKeys
             _rootVisualElement = rootVisualElement;
         }
 
-        /// <summary>
-        /// Shows key hint badges on the given buttons.
-        /// Each button in the list gets a label showing which key activates it.
-        /// Buttons are grouped: groups[0] gets keys[0], groups[1] gets keys[1], etc.
-        /// </summary>
         public void ShowHints(
             List<List<ToolbarScanner.ButtonInfo>> groups,
             string[] keyLabels)
@@ -44,19 +36,51 @@ namespace SequencedKeys
             {
                 var group = groups[groupIndex];
                 var keyLabel = keyLabels[groupIndex];
+                var groupHints = new List<VisualElement>();
 
                 foreach (var buttonInfo in group)
                 {
                     var hint = CreateHintBadge(keyLabel, buttonInfo.Root);
-                    _activeHints.Add(hint);
+                    groupHints.Add(hint);
                     _overlayContainer.Add(hint);
+                }
+
+                _hintsByGroup.Add(groupHints);
+            }
+        }
+
+        public void HighlightGroup(int groupIndex)
+        {
+            ClearHighlight();
+
+            if (groupIndex < 0 || groupIndex >= _hintsByGroup.Count)
+                return;
+
+            foreach (var hint in _hintsByGroup[groupIndex])
+            {
+                hint.style.backgroundColor = HintHighlightBg;
+                hint.style.borderLeftColor = HintHighlightBorder;
+                hint.style.borderRightColor = HintHighlightBorder;
+                hint.style.borderTopColor = HintHighlightBorder;
+                hint.style.borderBottomColor = HintHighlightBorder;
+            }
+        }
+
+        public void ClearHighlight()
+        {
+            foreach (var group in _hintsByGroup)
+            {
+                foreach (var hint in group)
+                {
+                    hint.style.backgroundColor = HintBackgroundColor;
+                    hint.style.borderLeftColor = HintTextColor;
+                    hint.style.borderRightColor = HintTextColor;
+                    hint.style.borderTopColor = HintTextColor;
+                    hint.style.borderBottomColor = HintTextColor;
                 }
             }
         }
 
-        /// <summary>
-        /// Shows the status bar indicating sequenced key mode is active.
-        /// </summary>
         public void ShowStatusBar(string breadcrumb)
         {
             EnsureOverlayContainer();
@@ -104,9 +128,6 @@ namespace SequencedKeys
                 _overlayContainer.Add(_statusBar);
         }
 
-        /// <summary>
-        /// Removes all hints and the status bar.
-        /// </summary>
         public void Hide()
         {
             ClearHints();
@@ -118,12 +139,15 @@ namespace SequencedKeys
 
         private void ClearHints()
         {
-            foreach (var hint in _activeHints)
+            foreach (var group in _hintsByGroup)
             {
-                if (hint.parent != null)
-                    hint.RemoveFromHierarchy();
+                foreach (var hint in group)
+                {
+                    if (hint.parent != null)
+                        hint.RemoveFromHierarchy();
+                }
             }
-            _activeHints.Clear();
+            _hintsByGroup.Clear();
         }
 
         private void EnsureOverlayContainer()
@@ -174,8 +198,6 @@ namespace SequencedKeys
             label.style.unityTextAlign = TextAnchor.MiddleCenter;
             badge.Add(label);
 
-            // Position the badge over the target button using a schedule callback
-            // to ensure layout is resolved
             badge.RegisterCallback<GeometryChangedEvent>(_ => PositionBadge(badge, targetButton));
             badge.schedule.Execute(() => PositionBadge(badge, targetButton));
 
@@ -193,7 +215,6 @@ namespace SequencedKeys
             if (float.IsNaN(targetRect.x) || float.IsNaN(overlayRect.x))
                 return;
 
-            // Position at top-left corner of the target button
             badge.style.left = targetRect.x - overlayRect.x;
             badge.style.top = targetRect.y - overlayRect.y;
         }

@@ -1,8 +1,10 @@
 using System.Collections.Generic;
+using System.Text;
 using Timberborn.InputSystem;
 using Timberborn.KeyBindingSystem;
 using Timberborn.SingletonSystem;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.UIElements;
 
 namespace SequencedKeys
@@ -28,6 +30,9 @@ namespace SequencedKeys
         private VisualElement _uiRoot;
 
         private int _deferredScanCountdown;
+
+        private int _heldKeyIndex = -1;
+        private InputControl _heldControl;
 
         private bool _keysRegistered;
 
@@ -95,6 +100,9 @@ namespace SequencedKeys
             {
                 if (SafeIsKeyDown(_activateKeyId))
                 {
+                    Debug.Log("[SequencedKeys] Activate key pressed while active → deactivating.");
+                    _heldKeyIndex = -1;
+                    _heldControl = null;
                     Deactivate();
                     return true;
                 }
@@ -102,11 +110,39 @@ namespace SequencedKeys
                 if (_deferredScanCountdown > 0)
                     return true;
 
+                if (_heldKeyIndex >= 0)
+                {
+                    if (_heldControl == null || !_heldControl.IsPressed())
+                    {
+                        int idx = _heldKeyIndex;
+                        _heldKeyIndex = -1;
+                        _heldControl = null;
+                        _overlay?.ClearHighlight();
+                        Debug.Log($"[SequencedKeys] Key released: {_selectKeyLabels[idx]} → selecting group {idx}.");
+                        OnSelectionKeyPressed(idx);
+                    }
+                    return true;
+                }
+
                 for (int i = 0; i < _selectKeyIds.Length; i++)
                 {
                     if (SafeIsKeyDown(_selectKeyIds[i]))
                     {
-                        OnSelectionKeyPressed(i);
+                        _heldKeyIndex = i;
+                        _heldControl = GetInputControl(_selectKeyIds[i]);
+                        _overlay?.HighlightGroup(i);
+
+                        if (_heldControl != null)
+                        {
+                            Debug.Log($"[SequencedKeys] Key down: {_selectKeyLabels[i]} — holding for release.");
+                        }
+                        else
+                        {
+                            Debug.Log($"[SequencedKeys] Key down: {_selectKeyLabels[i]} — no InputControl, selecting immediately.");
+                            _heldKeyIndex = -1;
+                            _overlay?.ClearHighlight();
+                            OnSelectionKeyPressed(i);
+                        }
                         return true;
                     }
                 }
@@ -116,6 +152,7 @@ namespace SequencedKeys
 
             if (SafeIsKeyDown(_activateKeyId))
             {
+                Debug.Log("[SequencedKeys] Activate key pressed → activating.");
                 Activate();
                 return true;
             }
@@ -169,6 +206,19 @@ namespace SequencedKeys
             catch (KeyNotFoundException) { return false; }
         }
 
+        private InputControl GetInputControl(string keyId)
+        {
+            try
+            {
+                var binding = _keyBindingRegistry.Get(keyId);
+                var primary = binding?.PrimaryInputBinding;
+                if (primary != null && primary.IsDefined)
+                    return primary.InputControl;
+            }
+            catch { }
+            return null;
+        }
+
         private static readonly string[] DefaultKeyLabels =
             { "Q", "W", "E", "R", "A", "S", "D", "F", "Z", "X", "C", "V" };
 
@@ -210,6 +260,8 @@ namespace SequencedKeys
 
             _isActive = true;
             _showingCategories = true;
+            _heldKeyIndex = -1;
+            _heldControl = null;
             _breadcrumb = "SEQUENCED KEYS";
             _deferredScanCountdown = 0;
             ScanAndShow();
@@ -217,8 +269,11 @@ namespace SequencedKeys
 
         private void Deactivate()
         {
+            Debug.Log("[SequencedKeys] Deactivate().");
             _isActive = false;
             _deferredScanCountdown = 0;
+            _heldKeyIndex = -1;
+            _heldControl = null;
             _currentButtons = null;
             _currentGroups = null;
             _breadcrumb = "";
@@ -236,6 +291,7 @@ namespace SequencedKeys
 
             Debug.Log($"[SequencedKeys] ScanAndShow: showingCategories={_showingCategories}, " +
                       $"found {_currentButtons.Count} button(s).");
+            LogButtonList(_currentButtons);
 
             if (_currentButtons.Count == 0)
             {
@@ -243,7 +299,8 @@ namespace SequencedKeys
                 {
                     _showingCategories = false;
                     _currentButtons = _toolbarScanner.ScanToolButtons(_uiRoot);
-                    Debug.Log($"[SequencedKeys] No categories found, falling back to tools: {_currentButtons.Count}.");
+                    Debug.Log($"[SequencedKeys] No categories, falling back to tools: {_currentButtons.Count}.");
+                    LogButtonList(_currentButtons);
                     if (_currentButtons.Count == 0)
                     {
                         _overlay?.Hide();
@@ -266,6 +323,22 @@ namespace SequencedKeys
             }
 
             SubdivideAndShow();
+        }
+
+        private void LogButtonList(List<ToolbarScanner.ButtonInfo> buttons)
+        {
+            if (buttons.Count == 0) return;
+            var sb = new StringBuilder();
+            sb.Append("[SequencedKeys]   Buttons: ");
+            int limit = buttons.Count > 15 ? 15 : buttons.Count;
+            for (int i = 0; i < limit; i++)
+            {
+                if (i > 0) sb.Append(", ");
+                sb.Append('"').Append(buttons[i].Label).Append('"');
+            }
+            if (buttons.Count > 15)
+                sb.Append($", ... +{buttons.Count - 15} more");
+            Debug.Log(sb.ToString());
         }
 
         private void SubdivideAndShow()
@@ -304,7 +377,10 @@ namespace SequencedKeys
         private void OnSelectionKeyPressed(int keyIndex)
         {
             if (_currentGroups == null || keyIndex >= _currentGroups.Count)
+            {
+                Debug.Log($"[SequencedKeys] Key {keyIndex} out of range (groups={_currentGroups?.Count ?? 0}).");
                 return;
+            }
 
             var selectedGroup = _currentGroups[keyIndex];
             if (selectedGroup.Count == 0)
@@ -312,10 +388,21 @@ namespace SequencedKeys
 
             if (selectedGroup.Count == 1)
             {
+                Debug.Log($"[SequencedKeys] Selected [{_selectKeyLabels[keyIndex]}] → " +
+                          $"clicking '{selectedGroup[0].Label}'.");
                 ClickButton(selectedGroup[0]);
             }
             else
             {
+                var sb = new StringBuilder();
+                for (int i = 0; i < selectedGroup.Count; i++)
+                {
+                    if (i > 0) sb.Append(", ");
+                    sb.Append('"').Append(selectedGroup[i].Label).Append('"');
+                }
+                Debug.Log($"[SequencedKeys] Selected [{_selectKeyLabels[keyIndex]}] → " +
+                          $"subdividing {selectedGroup.Count} buttons: [{sb}].");
+
                 _breadcrumb += " > " + _selectKeyLabels[keyIndex];
                 _currentButtons = selectedGroup;
                 SubdivideAndShow();
@@ -327,7 +414,9 @@ namespace SequencedKeys
             _breadcrumb += " > " + buttonInfo.Label;
             _overlay?.Hide();
 
-            Debug.Log($"[SequencedKeys] ClickButton: '{buttonInfo.Label}', showingCategories={_showingCategories}");
+            Debug.Log($"[SequencedKeys] ClickButton: '{buttonInfo.Label}', " +
+                      $"showingCategories={_showingCategories}, " +
+                      $"btnName='{buttonInfo.ClickableButton.name}'.");
 
             var button = buttonInfo.ClickableButton;
             using (var clickEvt = ClickEvent.GetPooled())
@@ -337,9 +426,15 @@ namespace SequencedKeys
             }
 
             if (_showingCategories)
+            {
+                Debug.Log("[SequencedKeys] Category clicked — scheduling tool scan in 5 frames.");
                 _deferredScanCountdown = 5;
+            }
             else
+            {
+                Debug.Log("[SequencedKeys] Tool clicked — deactivating.");
                 Deactivate();
+            }
         }
 
         private void RescanAfterClick()
@@ -347,6 +442,7 @@ namespace SequencedKeys
             if (!_isActive || _uiRoot == null)
                 return;
 
+            Debug.Log("[SequencedKeys] RescanAfterClick — switching to tool buttons.");
             _showingCategories = false;
             ScanAndShow();
         }
