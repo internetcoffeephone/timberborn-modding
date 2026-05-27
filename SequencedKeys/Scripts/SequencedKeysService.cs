@@ -450,6 +450,8 @@ namespace SequencedKeys
             if (selectedGroup.Count == 0)
                 return;
 
+            _breadcrumb += " > " + _boundKeyLabels[keyIndex];
+
             if (selectedGroup.Count == 1)
             {
                 Debug.Log($"[SequencedKeys] Selected [{_boundKeyLabels[keyIndex]}] → " +
@@ -467,7 +469,6 @@ namespace SequencedKeys
                 Debug.Log($"[SequencedKeys] Selected [{_boundKeyLabels[keyIndex]}] → " +
                           $"subdividing {selectedGroup.Count} buttons: [{sb}].");
 
-                _breadcrumb += " > " + _boundKeyLabels[keyIndex];
                 _currentButtons = selectedGroup;
                 SubdivideAndShow();
             }
@@ -475,9 +476,6 @@ namespace SequencedKeys
 
         private void ClickButton(ToolbarScanner.ButtonInfo buttonInfo)
         {
-            var label = buttonInfo.Label;
-            if (label != buttonInfo.ClickableButton.name)
-                _breadcrumb += " > " + label;
             _overlay?.Hide();
 
             Debug.Log($"[SequencedKeys] ClickButton: '{buttonInfo.Label}', " +
