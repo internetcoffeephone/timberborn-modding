@@ -8,19 +8,18 @@ namespace SequencedKeys
     {
         public class ButtonInfo
         {
-            public VisualElement Root { get; }
             public Button ClickableButton { get; }
             public string Label { get; }
 
-            public ButtonInfo(VisualElement root, Button clickableButton, string label)
+            public ButtonInfo(Button clickableButton, string label)
             {
-                Root = root;
                 ClickableButton = clickableButton;
                 Label = label;
             }
         }
 
         private bool _loggedStructure;
+        private bool _loggedToolButtons;
 
         public List<ButtonInfo> ScanCategories(VisualElement rootVisualElement)
         {
@@ -41,6 +40,19 @@ namespace SequencedKeys
 
             var results = ScanByButtonName(target, "ToolButton");
             Debug.Log($"[SequencedKeys] ScanToolButtons: found {results.Count} ToolButton(s).");
+
+            if (!_loggedToolButtons && results.Count > 0)
+            {
+                _loggedToolButtons = true;
+                for (int i = 0; i < results.Count && i < 5; i++)
+                {
+                    var btn = results[i].ClickableButton;
+                    var r = btn.worldBound;
+                    Debug.Log($"[SequencedKeys]   ToolButton[{i}] worldBound: x={r.x:F0} y={r.y:F0} w={r.width:F0} h={r.height:F0}, " +
+                              $"parent='{btn.parent?.name}', grandparent='{btn.parent?.parent?.name}'");
+                }
+            }
+
             return results;
         }
 
@@ -84,17 +96,16 @@ namespace SequencedKeys
             {
                 if (seen.Add(btn) && IsEffectivelyVisible(btn) && btn.enabledSelf)
                 {
-                    var wrapper = FindButtonWrapper(btn);
-                    var label = ExtractLabel(btn, wrapper);
+                    var label = ExtractLabel(btn);
                     if (label != "Tooltip" && label != "Options")
-                        results.Add(new ButtonInfo(wrapper, btn, label));
+                        results.Add(new ButtonInfo(btn, label));
                 }
             });
 
             results.Sort((a, b) =>
             {
-                float ax = a.Root.worldBound.x;
-                float bx = b.Root.worldBound.x;
+                float ax = a.ClickableButton.worldBound.x;
+                float bx = b.ClickableButton.worldBound.x;
                 if (float.IsNaN(ax) || float.IsNaN(bx))
                     return 0;
                 return ax.CompareTo(bx);
@@ -103,33 +114,10 @@ namespace SequencedKeys
             return results;
         }
 
-        private VisualElement FindButtonWrapper(Button button)
-        {
-            var current = button.parent;
-            int depth = 0;
-            while (current != null && depth < 5)
-            {
-                if (!string.IsNullOrEmpty(current.tooltip))
-                    return current;
-                if (current.ClassListContains("tool-button") ||
-                    current.ClassListContains("tool-group-button") ||
-                    current.ClassListContains("tool-group"))
-                    return current;
-                if (current.parent != null && current.parent.childCount > 15)
-                    return current;
-                current = current.parent;
-                depth++;
-            }
-            return button.parent ?? button;
-        }
-
-        private string ExtractLabel(Button button, VisualElement wrapper)
+        private string ExtractLabel(Button button)
         {
             if (!string.IsNullOrEmpty(button.tooltip))
                 return button.tooltip;
-
-            if (wrapper != button && !string.IsNullOrEmpty(wrapper.tooltip))
-                return wrapper.tooltip;
 
             var current = button.parent;
             for (int d = 0; d < 6 && current != null; d++)
@@ -145,18 +133,19 @@ namespace SequencedKeys
             if (label != null && !string.IsNullOrEmpty(label.text))
                 return label.text;
 
-            if (wrapper != button)
+            var parent = button.parent;
+            if (parent != null && parent != button)
             {
-                label = wrapper.Q<Label>();
+                label = parent.Q<Label>();
                 if (label != null && !string.IsNullOrEmpty(label.text))
                     return label.text;
 
-                var textEl = wrapper.Q<TextElement>();
+                var textEl = parent.Q<TextElement>();
                 if (textEl != null && !string.IsNullOrEmpty(textEl.text))
                     return textEl.text;
             }
 
-            return button.name ?? wrapper.name ?? "?";
+            return button.name ?? "?";
         }
 
         private bool IsEffectivelyVisible(VisualElement element)
