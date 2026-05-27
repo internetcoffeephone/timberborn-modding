@@ -475,7 +475,9 @@ namespace SequencedKeys
 
         private void ClickButton(ToolbarScanner.ButtonInfo buttonInfo)
         {
-            _breadcrumb += " > " + buttonInfo.Label;
+            var label = buttonInfo.Label;
+            if (label != buttonInfo.ClickableButton.name)
+                _breadcrumb += " > " + label;
             _overlay?.Hide();
 
             Debug.Log($"[SequencedKeys] ClickButton: '{buttonInfo.Label}', " +
