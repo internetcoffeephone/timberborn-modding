@@ -100,9 +100,9 @@ namespace SequencedKeys
 
             if (_isActive)
             {
-                if (SafeIsKeyDown(_activateKeyId))
+                if (SafeIsKeyDown(_activateKeyId) || IsEscapeDown())
                 {
-                    Debug.Log("[SequencedKeys] Activate key pressed while active → deactivating.");
+                    Debug.Log("[SequencedKeys] Activate/Escape key pressed while active → deactivating.");
                     _heldKeyIndex = -1;
                     _heldControl = null;
                     Deactivate();
@@ -236,6 +236,12 @@ namespace SequencedKeys
         {
             try { return _inputService.IsKeyDown(keyId); }
             catch (KeyNotFoundException) { return false; }
+        }
+
+        private bool IsEscapeDown()
+        {
+            var keyboard = Keyboard.current;
+            return keyboard != null && keyboard.escapeKey.wasPressedThisFrame;
         }
 
         private InputControl GetInputControl(string keyId)
@@ -465,20 +471,37 @@ namespace SequencedKeys
                       $"showingCategories={_showingCategories}, " +
                       $"btnName='{buttonInfo.ClickableButton.name}'.");
 
-            var button = buttonInfo.ClickableButton;
-            using (var clickEvt = ClickEvent.GetPooled())
-            {
-                clickEvt.target = button;
-                button.SendEvent(clickEvt);
-            }
-
             if (_showingCategories)
             {
+                var existingTools = _toolbarScanner.ScanToolButtons(_uiRoot);
+                if (existingTools.Count > 0)
+                {
+                    Debug.Log($"[SequencedKeys] Category submenu already open ({existingTools.Count} tools) " +
+                              $"— skipping click, progressing to tools.");
+                    _showingCategories = false;
+                    ScanAndShow();
+                    return;
+                }
+
+                var button = buttonInfo.ClickableButton;
+                using (var clickEvt = ClickEvent.GetPooled())
+                {
+                    clickEvt.target = button;
+                    button.SendEvent(clickEvt);
+                }
+
                 Debug.Log("[SequencedKeys] Category clicked — scheduling tool scan in 5 frames.");
                 _deferredScanCountdown = 5;
             }
             else
             {
+                var button = buttonInfo.ClickableButton;
+                using (var clickEvt = ClickEvent.GetPooled())
+                {
+                    clickEvt.target = button;
+                    button.SendEvent(clickEvt);
+                }
+
                 Debug.Log("[SequencedKeys] Tool clicked — deactivating.");
                 Deactivate();
             }
