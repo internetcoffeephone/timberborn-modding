@@ -36,6 +36,8 @@ namespace SequencedKeys
         private int _heldKeyIndex = -1;
         private InputControl _heldControl;
 
+        private Button _lastClickedCategoryButton;
+
         private bool _keysRegistered;
 
         private int _processInputCallCount;
@@ -76,6 +78,15 @@ namespace SequencedKeys
 
         public void UpdateSingleton()
         {
+            if (_isActive && IsEscapeDown())
+            {
+                Debug.Log("[SequencedKeys] Escape pressed (UpdateSingleton) → deactivating.");
+                _heldKeyIndex = -1;
+                _heldControl = null;
+                Deactivate();
+                return;
+            }
+
             if (!_isActive || _deferredScanCountdown <= 0)
                 return;
 
@@ -100,9 +111,9 @@ namespace SequencedKeys
 
             if (_isActive)
             {
-                if (SafeIsKeyDown(_activateKeyId) || IsEscapeDown())
+                if (SafeIsKeyDown(_activateKeyId))
                 {
-                    Debug.Log("[SequencedKeys] Activate/Escape key pressed while active → deactivating.");
+                    Debug.Log("[SequencedKeys] Activate key pressed while active → deactivating.");
                     _heldKeyIndex = -1;
                     _heldControl = null;
                     Deactivate();
@@ -473,24 +484,28 @@ namespace SequencedKeys
 
             if (_showingCategories)
             {
+                var button = buttonInfo.ClickableButton;
+                bool isSameCategory = _lastClickedCategoryButton == button;
                 var existingTools = _toolbarScanner.ScanToolButtons(_uiRoot);
-                if (existingTools.Count > 0)
+
+                if (isSameCategory && existingTools.Count > 0)
                 {
-                    Debug.Log($"[SequencedKeys] Category submenu already open ({existingTools.Count} tools) " +
+                    Debug.Log($"[SequencedKeys] Same category already open ({existingTools.Count} tools) " +
                               $"— skipping click, progressing to tools.");
                     _showingCategories = false;
                     ScanAndShow();
                     return;
                 }
 
-                var button = buttonInfo.ClickableButton;
+                _lastClickedCategoryButton = button;
                 using (var clickEvt = ClickEvent.GetPooled())
                 {
                     clickEvt.target = button;
                     button.SendEvent(clickEvt);
                 }
 
-                Debug.Log("[SequencedKeys] Category clicked — scheduling tool scan in 5 frames.");
+                Debug.Log($"[SequencedKeys] Category clicked (sameAsPrev={isSameCategory}, " +
+                          $"existingTools={existingTools.Count}) — scheduling tool scan in 5 frames.");
                 _deferredScanCountdown = 5;
             }
             else
