@@ -12,9 +12,9 @@ namespace SequencedKeys
         private VisualElement _statusBar;
         private Label _statusLabel;
 
-        private static readonly Color HintBackgroundColor = new Color(0.1f, 0.1f, 0.1f, 0.85f);
+        private static readonly Color HintBackgroundColor = new Color(0.1f, 0.1f, 0.1f, 0.35f);
         private static readonly Color HintTextColor = new Color(1f, 0.9f, 0.2f, 1f);
-        private static readonly Color HintHighlightBg = new Color(0.15f, 0.45f, 0.1f, 0.92f);
+        private static readonly Color HintHighlightBg = new Color(0.15f, 0.45f, 0.1f, 0.4f);
         private static readonly Color HintHighlightBorder = new Color(0.3f, 0.9f, 0.2f, 1f);
         private static readonly Color StatusBackgroundColor = new Color(0.05f, 0.05f, 0.15f, 0.9f);
         private static readonly Color StatusTextColor = new Color(0.8f, 0.9f, 1f, 1f);
@@ -206,7 +206,7 @@ namespace SequencedKeys
 
             foreach (var btn in buttons)
             {
-                var rect = btn.Root.worldBound;
+                var rect = btn.ClickableButton.worldBound;
                 if (float.IsNaN(rect.x))
                     continue;
                 if (rect.x < minX) minX = rect.x;
