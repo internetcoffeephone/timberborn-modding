@@ -8,7 +8,7 @@ namespace SequencedKeys
     {
         private readonly VisualElement _rootVisualElement;
         private VisualElement _overlayContainer;
-        private readonly List<List<VisualElement>> _hintsByGroup = new List<List<VisualElement>>();
+        private readonly List<VisualElement> _groupBadges = new List<VisualElement>();
         private VisualElement _statusBar;
         private Label _statusLabel;
 
@@ -35,17 +35,12 @@ namespace SequencedKeys
             for (int groupIndex = 0; groupIndex < groups.Count && groupIndex < keyLabels.Length; groupIndex++)
             {
                 var group = groups[groupIndex];
+                if (group.Count == 0) continue;
+
                 var keyLabel = keyLabels[groupIndex];
-                var groupHints = new List<VisualElement>();
-
-                foreach (var buttonInfo in group)
-                {
-                    var hint = CreateHintBadge(keyLabel, buttonInfo.Root);
-                    groupHints.Add(hint);
-                    _overlayContainer.Add(hint);
-                }
-
-                _hintsByGroup.Add(groupHints);
+                var badge = CreateGroupBadge(keyLabel, group);
+                _groupBadges.Add(badge);
+                _overlayContainer.Add(badge);
             }
         }
 
@@ -53,31 +48,26 @@ namespace SequencedKeys
         {
             ClearHighlight();
 
-            if (groupIndex < 0 || groupIndex >= _hintsByGroup.Count)
+            if (groupIndex < 0 || groupIndex >= _groupBadges.Count)
                 return;
 
-            foreach (var hint in _hintsByGroup[groupIndex])
-            {
-                hint.style.backgroundColor = HintHighlightBg;
-                hint.style.borderLeftColor = HintHighlightBorder;
-                hint.style.borderRightColor = HintHighlightBorder;
-                hint.style.borderTopColor = HintHighlightBorder;
-                hint.style.borderBottomColor = HintHighlightBorder;
-            }
+            var badge = _groupBadges[groupIndex];
+            badge.style.backgroundColor = HintHighlightBg;
+            badge.style.borderLeftColor = HintHighlightBorder;
+            badge.style.borderRightColor = HintHighlightBorder;
+            badge.style.borderTopColor = HintHighlightBorder;
+            badge.style.borderBottomColor = HintHighlightBorder;
         }
 
         public void ClearHighlight()
         {
-            foreach (var group in _hintsByGroup)
+            foreach (var badge in _groupBadges)
             {
-                foreach (var hint in group)
-                {
-                    hint.style.backgroundColor = HintBackgroundColor;
-                    hint.style.borderLeftColor = HintTextColor;
-                    hint.style.borderRightColor = HintTextColor;
-                    hint.style.borderTopColor = HintTextColor;
-                    hint.style.borderBottomColor = HintTextColor;
-                }
+                badge.style.backgroundColor = HintBackgroundColor;
+                badge.style.borderLeftColor = HintTextColor;
+                badge.style.borderRightColor = HintTextColor;
+                badge.style.borderTopColor = HintTextColor;
+                badge.style.borderBottomColor = HintTextColor;
             }
         }
 
@@ -139,15 +129,12 @@ namespace SequencedKeys
 
         private void ClearHints()
         {
-            foreach (var group in _hintsByGroup)
+            foreach (var badge in _groupBadges)
             {
-                foreach (var hint in group)
-                {
-                    if (hint.parent != null)
-                        hint.RemoveFromHierarchy();
-                }
+                if (badge.parent != null)
+                    badge.RemoveFromHierarchy();
             }
-            _hintsByGroup.Clear();
+            _groupBadges.Clear();
         }
 
         private void EnsureOverlayContainer()
@@ -167,7 +154,7 @@ namespace SequencedKeys
             _rootVisualElement.Add(_overlayContainer);
         }
 
-        private VisualElement CreateHintBadge(string keyText, VisualElement targetButton)
+        private VisualElement CreateGroupBadge(string keyText, List<ToolbarScanner.ButtonInfo> buttons)
         {
             var badge = new VisualElement();
             badge.pickingMode = PickingMode.Ignore;
@@ -177,10 +164,6 @@ namespace SequencedKeys
             badge.style.borderTopRightRadius = 4;
             badge.style.borderBottomLeftRadius = 4;
             badge.style.borderBottomRightRadius = 4;
-            badge.style.paddingLeft = 5;
-            badge.style.paddingRight = 5;
-            badge.style.paddingTop = 2;
-            badge.style.paddingBottom = 2;
             badge.style.borderLeftWidth = 1;
             badge.style.borderRightWidth = 1;
             badge.style.borderTopWidth = 1;
@@ -189,34 +172,56 @@ namespace SequencedKeys
             badge.style.borderRightColor = HintTextColor;
             badge.style.borderTopColor = HintTextColor;
             badge.style.borderBottomColor = HintTextColor;
+            badge.style.alignItems = Align.Center;
+            badge.style.justifyContent = Justify.Center;
+            badge.style.overflow = Overflow.Hidden;
 
             var label = new Label(keyText.ToUpperInvariant());
             label.pickingMode = PickingMode.Ignore;
             label.style.color = HintTextColor;
-            label.style.fontSize = 14;
+            label.style.fontSize = 16;
             label.style.unityFontStyleAndWeight = FontStyle.Bold;
             label.style.unityTextAlign = TextAnchor.MiddleCenter;
             badge.Add(label);
 
-            badge.RegisterCallback<GeometryChangedEvent>(_ => PositionBadge(badge, targetButton));
-            badge.schedule.Execute(() => PositionBadge(badge, targetButton));
+            badge.RegisterCallback<GeometryChangedEvent>(_ => PositionGroupBadge(badge, buttons));
+            badge.schedule.Execute(() => PositionGroupBadge(badge, buttons));
 
             return badge;
         }
 
-        private void PositionBadge(VisualElement badge, VisualElement target)
+        private void PositionGroupBadge(VisualElement badge, List<ToolbarScanner.ButtonInfo> buttons)
         {
-            if (_overlayContainer == null || target == null)
+            if (_overlayContainer == null || buttons.Count == 0)
                 return;
 
-            var targetRect = target.worldBound;
             var overlayRect = _overlayContainer.worldBound;
-
-            if (float.IsNaN(targetRect.x) || float.IsNaN(overlayRect.x))
+            if (float.IsNaN(overlayRect.x))
                 return;
 
-            badge.style.left = targetRect.x - overlayRect.x;
-            badge.style.top = targetRect.y - overlayRect.y;
+            float minX = float.MaxValue;
+            float minY = float.MaxValue;
+            float maxX = float.MinValue;
+            float maxY = float.MinValue;
+
+            foreach (var btn in buttons)
+            {
+                var rect = btn.Root.worldBound;
+                if (float.IsNaN(rect.x))
+                    continue;
+                if (rect.x < minX) minX = rect.x;
+                if (rect.y < minY) minY = rect.y;
+                if (rect.xMax > maxX) maxX = rect.xMax;
+                if (rect.yMax > maxY) maxY = rect.yMax;
+            }
+
+            if (minX == float.MaxValue)
+                return;
+
+            badge.style.left = minX - overlayRect.x;
+            badge.style.top = minY - overlayRect.y;
+            badge.style.width = maxX - minX;
+            badge.style.height = maxY - minY;
         }
     }
 }
