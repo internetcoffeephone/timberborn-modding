@@ -27,7 +27,7 @@ namespace SequencedKeys
         private bool _showingCategories;
         private List<ToolbarScanner.ButtonInfo> _currentButtons;
         private List<List<ToolbarScanner.ButtonInfo>> _currentGroups;
-        private string _breadcrumb;
+        private readonly List<string> _pressedKeys = new List<string>();
 
         private VisualElement _uiRoot;
 
@@ -296,7 +296,7 @@ namespace SequencedKeys
             _showingCategories = true;
             _heldKeyIndex = -1;
             _heldControl = null;
-            _breadcrumb = "SEQUENCED KEYS";
+            _pressedKeys.Clear();
             _deferredScanCountdown = 0;
 
             if (_boundKeyIds.Length < SequencedKeysConstants.MinSelectionKeys)
@@ -311,6 +311,13 @@ namespace SequencedKeys
             }
 
             ScanAndShow();
+        }
+
+        private string BuildBreadcrumb()
+        {
+            if (_pressedKeys.Count == 0)
+                return "SEQUENCED KEYS";
+            return "SEQUENCED KEYS > " + string.Join(" > ", _pressedKeys);
         }
 
         private string GetActivateLabel()
@@ -338,7 +345,7 @@ namespace SequencedKeys
             _heldControl = null;
             _currentButtons = null;
             _currentGroups = null;
-            _breadcrumb = "";
+            _pressedKeys.Clear();
             _overlay?.Hide();
         }
 
@@ -367,7 +374,7 @@ namespace SequencedKeys
                     {
                         _overlay?.Hide();
                         var activateLabel = GetActivateLabel();
-                        _overlay?.ShowStatusBar(_breadcrumb + " (no buttons)  |  " + activateLabel + " to close");
+                        _overlay?.ShowStatusBar(BuildBreadcrumb() + " (no buttons)  |  " + activateLabel + " to close");
                         return;
                     }
                 }
@@ -435,7 +442,7 @@ namespace SequencedKeys
             _overlay?.ShowHints(_currentGroups, _boundKeyLabels);
 
             var activateLabel = GetActivateLabel();
-            _overlay?.ShowStatusBar(_breadcrumb + "  |  " + activateLabel + " to close");
+            _overlay?.ShowStatusBar(BuildBreadcrumb() + "  |  " + activateLabel + " to close");
         }
 
         private void OnSelectionKeyPressed(int keyIndex)
@@ -450,7 +457,7 @@ namespace SequencedKeys
             if (selectedGroup.Count == 0)
                 return;
 
-            _breadcrumb += " > " + _boundKeyLabels[keyIndex];
+            _pressedKeys.Add(_boundKeyLabels[keyIndex]);
 
             if (selectedGroup.Count == 1)
             {
