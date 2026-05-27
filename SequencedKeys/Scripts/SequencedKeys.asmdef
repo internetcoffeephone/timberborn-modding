@@ -1,5 +1,8 @@
 {
   "name": "SequencedKeys",
   "autoReferenced": false,
-  "allowUnsafeCode": true
+  "allowUnsafeCode": true,
+  "references": [
+    "Unity.InputSystem"
+  ]
 }
