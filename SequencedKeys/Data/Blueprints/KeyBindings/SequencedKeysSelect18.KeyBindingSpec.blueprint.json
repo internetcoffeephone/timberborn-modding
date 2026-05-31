@@ -1,0 +1,13 @@
+{
+  "KeyBindingSpec": {
+    "Id": "SequencedKeysSelect18",
+    "GroupId": "SequencedKeys",
+    "LocKey": "SequencedKeys.Select18",
+    "Order": 18,
+    "AllowOtherModifiers": false
+  },
+  "PrimaryInputBindingSpec": {
+    "Path": "/Keyboard/t",
+    "InputModifiers": "None"
+  }
+}

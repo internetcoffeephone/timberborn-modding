@@ -269,7 +269,8 @@ namespace SequencedKeys
         }
 
         private static readonly string[] DefaultKeyLabels =
-            { "Q", "W", "E", "R", "A", "S", "D", "F", "Z", "X", "C", "V" };
+            { "Q", "W", "E", "R", "A", "S", "D", "F", "Z", "X", "C", "V",
+              "1", "2", "3", "4", "5", "T", "G" };
 
         private string GetFallbackLabel(string keyId)
         {

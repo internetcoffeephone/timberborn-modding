@@ -1,0 +1,13 @@
+{
+  "KeyBindingSpec": {
+    "Id": "SequencedKeysSelect17",
+    "GroupId": "SequencedKeys",
+    "LocKey": "SequencedKeys.Select17",
+    "Order": 17,
+    "AllowOtherModifiers": false
+  },
+  "PrimaryInputBindingSpec": {
+    "Path": "/Keyboard/5",
+    "InputModifiers": "None"
+  }
+}

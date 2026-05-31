@@ -1,0 +1,13 @@
+{
+  "KeyBindingSpec": {
+    "Id": "SequencedKeysSelect19",
+    "GroupId": "SequencedKeys",
+    "LocKey": "SequencedKeys.Select19",
+    "Order": 19,
+    "AllowOtherModifiers": false
+  },
+  "PrimaryInputBindingSpec": {
+    "Path": "/Keyboard/g",
+    "InputModifiers": "None"
+  }
+}
