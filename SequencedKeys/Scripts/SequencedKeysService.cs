@@ -78,9 +78,9 @@ namespace SequencedKeys
 
         public void UpdateSingleton()
         {
-            if (_isActive && IsEscapeDown())
+            if (_isActive && (IsEscapeDown() || IsRightClickDown()))
             {
-                Debug.Log("[SequencedKeys] Escape pressed (UpdateSingleton) → deactivating.");
+                Debug.Log("[SequencedKeys] Escape/RightClick (UpdateSingleton) → deactivating.");
                 _heldKeyIndex = -1;
                 _heldControl = null;
                 Deactivate();
@@ -139,7 +139,7 @@ namespace SequencedKeys
 
                 for (int i = 0; i < _boundKeyIds.Length; i++)
                 {
-                    if (SafeIsKeyDown(_boundKeyIds[i]))
+                    if (IsSelectionKeyDown(i))
                     {
                         _heldKeyIndex = i;
                         _heldControl = GetInputControl(_boundKeyIds[i]);
@@ -253,6 +253,22 @@ namespace SequencedKeys
         {
             var keyboard = Keyboard.current;
             return keyboard != null && keyboard.escapeKey.wasPressedThisFrame;
+        }
+
+        private bool IsRightClickDown()
+        {
+            var mouse = Mouse.current;
+            return mouse != null && mouse.rightButton.wasPressedThisFrame;
+        }
+
+        private bool IsSelectionKeyDown(int index)
+        {
+            if (SafeIsKeyDown(_boundKeyIds[index]))
+                return true;
+            var control = GetInputControl(_boundKeyIds[index]);
+            if (control is UnityEngine.InputSystem.Controls.ButtonControl bc)
+                return bc.wasPressedThisFrame;
+            return false;
         }
 
         private InputControl GetInputControl(string keyId)
@@ -425,7 +441,7 @@ namespace SequencedKeys
                 int index = 0;
                 for (int g = 0; g < keyCount; g++)
                 {
-                    int groupSize = baseSize + (g < remainder ? 1 : 0);
+                    int groupSize = baseSize + (g >= keyCount - remainder ? 1 : 0);
                     var group = new List<ToolbarScanner.ButtonInfo>();
                     for (int j = 0; j < groupSize && index < buttonCount; j++)
                         group.Add(_currentButtons[index++]);

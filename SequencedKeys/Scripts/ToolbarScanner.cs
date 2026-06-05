@@ -39,7 +39,10 @@ namespace SequencedKeys
                 return new List<ButtonInfo>();
 
             var results = ScanByButtonName(target, "ToolButton");
-            Debug.Log($"[SequencedKeys] ScanToolButtons: found {results.Count} ToolButton(s).");
+
+            var extraCount = ScanNonCategoryButtons(target, results);
+            Debug.Log($"[SequencedKeys] ScanToolButtons: found {results.Count} tool button(s) " +
+                      $"({extraCount} non-standard).");
 
             if (!_loggedToolButtons && results.Count > 0)
             {
@@ -49,11 +52,47 @@ namespace SequencedKeys
                     var btn = results[i].ClickableButton;
                     var r = btn.worldBound;
                     Debug.Log($"[SequencedKeys]   ToolButton[{i}] worldBound: x={r.x:F0} y={r.y:F0} w={r.width:F0} h={r.height:F0}, " +
-                              $"parent='{btn.parent?.name}', grandparent='{btn.parent?.parent?.name}'");
+                              $"parent='{btn.parent?.name}', grandparent='{btn.parent?.parent?.name}', " +
+                              $"btnName='{btn.name}'");
                 }
             }
 
             return results;
+        }
+
+        private int ScanNonCategoryButtons(VisualElement searchRoot, List<ButtonInfo> existingResults)
+        {
+            var seen = new HashSet<Button>();
+            foreach (var bi in existingResults)
+                seen.Add(bi.ClickableButton);
+
+            int added = 0;
+            searchRoot.Query<Button>().ForEach(btn =>
+            {
+                if (btn.name == "ToolGroupButton" || btn.name == "ToolButton")
+                    return;
+                if (!seen.Add(btn) || !IsEffectivelyVisible(btn) || !btn.enabledSelf)
+                    return;
+                var label = ExtractLabel(btn);
+                if (label == "Tooltip" || label == "Options")
+                    return;
+                existingResults.Add(new ButtonInfo(btn, label));
+                added++;
+            });
+
+            if (added > 0)
+            {
+                existingResults.Sort((a, b) =>
+                {
+                    float ax = a.ClickableButton.worldBound.x;
+                    float bx = b.ClickableButton.worldBound.x;
+                    if (float.IsNaN(ax) || float.IsNaN(bx))
+                        return 0;
+                    return ax.CompareTo(bx);
+                });
+            }
+
+            return added;
         }
 
         private VisualElement FindScanTarget(VisualElement rootVisualElement)
