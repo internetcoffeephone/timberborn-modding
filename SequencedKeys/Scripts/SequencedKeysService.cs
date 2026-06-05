@@ -139,7 +139,7 @@ namespace SequencedKeys
 
                 for (int i = 0; i < _boundKeyIds.Length; i++)
                 {
-                    if (IsSelectionKeyDown(i))
+                    if (SafeIsKeyDown(_boundKeyIds[i]))
                     {
                         _heldKeyIndex = i;
                         _heldControl = GetInputControl(_boundKeyIds[i]);
@@ -261,16 +261,6 @@ namespace SequencedKeys
             return mouse != null && mouse.rightButton.wasPressedThisFrame;
         }
 
-        private bool IsSelectionKeyDown(int index)
-        {
-            if (SafeIsKeyDown(_boundKeyIds[index]))
-                return true;
-            var control = GetInputControl(_boundKeyIds[index]);
-            if (control is UnityEngine.InputSystem.Controls.ButtonControl bc)
-                return bc.wasPressedThisFrame;
-            return false;
-        }
-
         private InputControl GetInputControl(string keyId)
         {
             try
@@ -306,6 +296,14 @@ namespace SequencedKeys
                 Debug.LogWarning("[SequencedKeys] Activate() — UI root not set.");
                 return;
             }
+
+            // Re-register so we become the most-recently-added input processor,
+            // giving us top priority in the chain. This lets us consume selection
+            // keys (e.g. 1/2/3 for game speed, T for transparency) before the
+            // game's own systems read and act on them this frame.
+            _inputService.RemoveInputProcessor(this);
+            _inputService.AddInputProcessor(this);
+            Debug.Log("[SequencedKeys] Re-registered input processor for top priority.");
 
             RefreshBoundKeys();
 
