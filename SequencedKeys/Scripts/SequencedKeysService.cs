@@ -38,6 +38,13 @@ namespace SequencedKeys
 
         private Button _lastClickedCategoryButton;
 
+        // Physical controls and keyIds owned by this mod. Used to suppress other
+        // key bindings (e.g. game speed on 1/2/3, transparency on T) that share a
+        // physical key but live under a different keyId, by Lock()-ing them while
+        // sequenced mode is active.
+        private readonly HashSet<string> _ownKeyIds = new HashSet<string>();
+        private readonly HashSet<InputControl> _ownControls = new HashSet<InputControl>();
+
         private bool _keysRegistered;
 
         private int _processInputCallCount;
@@ -111,6 +118,10 @@ namespace SequencedKeys
 
             if (_isActive)
             {
+                // Lock any game binding sharing a physical key with ours so the
+                // game's own systems (speed, transparency, etc.) don't also react.
+                SuppressConflictingBindings();
+
                 if (SafeIsKeyDown(_activateKeyId))
                 {
                     Debug.Log("[SequencedKeys] Activate key pressed while active → deactivating.");
@@ -239,8 +250,80 @@ namespace SequencedKeys
             _boundKeyIds = ids.ToArray();
             _boundKeyLabels = labels.ToArray();
 
+            RebuildOwnedControls(ids);
+
             Debug.Log($"[SequencedKeys] RefreshBoundKeys: {_boundKeyIds.Length}/{_registeredKeyIds.Length} bound, " +
-                      $"labels=[{string.Join(", ", _boundKeyLabels)}]");
+                      $"labels=[{string.Join(", ", _boundKeyLabels)}], ownControls={_ownControls.Count}");
+        }
+
+        private void RebuildOwnedControls(List<string> selectionKeyIds)
+        {
+            _ownKeyIds.Clear();
+            _ownControls.Clear();
+
+            void Add(string keyId)
+            {
+                if (string.IsNullOrEmpty(keyId))
+                    return;
+                _ownKeyIds.Add(keyId);
+                try
+                {
+                    var binding = _keyBindingRegistry.Get(keyId);
+                    if (binding == null)
+                        return;
+                    var primary = binding.PrimaryInputBinding;
+                    if (primary != null && primary.IsDefined && primary.InputControl != null)
+                        _ownControls.Add(primary.InputControl);
+                    var secondary = binding.SecondaryInputBinding;
+                    if (secondary != null && secondary.IsDefined && secondary.InputControl != null)
+                        _ownControls.Add(secondary.InputControl);
+                }
+                catch { }
+            }
+
+            Add(_activateKeyId);
+            foreach (var id in selectionKeyIds)
+                Add(id);
+        }
+
+        /// <summary>
+        /// While sequenced mode is active, neutralizes any other key binding that
+        /// shares a physical key with one of ours (e.g. game speed on 1/2/3 or
+        /// transparency on T). Returning true from ProcessInput only stops other
+        /// input *processors*; systems that poll InputService.IsKeyDown in their
+        /// own update would still react. KeyBinding.Lock() clears the binding's
+        /// pressed state until the physical key is released, so those systems see
+        /// nothing.
+        /// </summary>
+        private void SuppressConflictingBindings()
+        {
+            if (_ownControls.Count == 0)
+                return;
+
+            try
+            {
+                foreach (var kb in _keyBindingRegistry.KeyBindings)
+                {
+                    if (kb == null || _ownKeyIds.Contains(kb.Id))
+                        continue;
+                    if (!kb.IsDown && !kb.IsHeld)
+                        continue;
+                    if (BindingUsesOwnedControl(kb))
+                        kb.Lock();
+                }
+            }
+            catch { }
+        }
+
+        private bool BindingUsesOwnedControl(KeyBinding kb)
+        {
+            var primary = kb.PrimaryInputBinding;
+            if (primary != null && primary.IsDefined && _ownControls.Contains(primary.InputControl))
+                return true;
+            var secondary = kb.SecondaryInputBinding;
+            if (secondary != null && secondary.IsDefined && _ownControls.Contains(secondary.InputControl))
+                return true;
+            return false;
         }
 
         private bool SafeIsKeyDown(string keyId)
