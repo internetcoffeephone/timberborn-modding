@@ -345,41 +345,14 @@ namespace SequencedKeys
             return mouse != null && mouse.rightButton.wasPressedThisFrame;
         }
 
-        private bool _loggedCategoryClasses;
-
         private bool IsCategoryAlreadySelected(Button button)
         {
-            if (_uiRoot == null)
+            // The game adds "button--active" to the ToolGroupButton's wrapper
+            // element (parent), not to the Button itself.
+            var wrapper = button.parent;
+            if (wrapper == null)
                 return false;
-
-            var siblings = new List<Button>();
-            _uiRoot.Query<Button>("ToolGroupButton").ForEach(btn => siblings.Add(btn));
-
-            if (siblings.Count < 2)
-                return false;
-
-            var classCounts = new Dictionary<string, int>();
-            foreach (var btn in siblings)
-                foreach (var cls in btn.GetClasses())
-                {
-                    classCounts.TryGetValue(cls, out int count);
-                    classCounts[cls] = count + 1;
-                }
-
-            if (!_loggedCategoryClasses)
-            {
-                _loggedCategoryClasses = true;
-                var allClasses = new List<string>(classCounts.Keys);
-                allClasses.Sort();
-                Debug.Log($"[SequencedKeys] Category button CSS classes ({siblings.Count} buttons): " +
-                          $"[{string.Join(", ", allClasses.ConvertAll(c => c + ":" + classCounts[c]))}]");
-            }
-
-            foreach (var cls in button.GetClasses())
-                if (cls.Contains("--") && classCounts.TryGetValue(cls, out int count) && count == 1)
-                    return true;
-
-            return false;
+            return wrapper.ClassListContains("button--active");
         }
 
         private InputControl GetInputControl(string keyId)
