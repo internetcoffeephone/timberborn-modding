@@ -345,14 +345,41 @@ namespace SequencedKeys
             return mouse != null && mouse.rightButton.wasPressedThisFrame;
         }
 
+        private bool _loggedWrapperSearch;
+
         private bool IsCategoryAlreadySelected(Button button)
         {
-            // The game adds "button--active" to the ToolGroupButton's wrapper
-            // element (parent), not to the Button itself.
-            var wrapper = button.parent;
-            if (wrapper == null)
-                return false;
-            return wrapper.ClassListContains("button--active");
+            // The game adds "button--active" to _toolGroupButtonWrapper,
+            // which may be several levels above the Button element.
+            var current = button.parent;
+            for (int depth = 0; depth < 6 && current != null; depth++)
+            {
+                if (!_loggedWrapperSearch)
+                {
+                    var classes = new List<string>();
+                    foreach (var c in current.GetClasses())
+                        classes.Add(c);
+                    Debug.Log($"[SequencedKeys] IsCategoryAlreadySelected ancestor[{depth}]: " +
+                              $"name='{current.name}', type={current.GetType().Name}, " +
+                              $"classes=[{string.Join(", ", classes)}]");
+                }
+
+                if (current.ClassListContains("button--active"))
+                {
+                    if (!_loggedWrapperSearch)
+                        Debug.Log($"[SequencedKeys] Found button--active at depth {depth}!");
+                    _loggedWrapperSearch = true;
+                    return true;
+                }
+                current = current.parent;
+            }
+
+            if (!_loggedWrapperSearch)
+            {
+                _loggedWrapperSearch = true;
+                Debug.Log("[SequencedKeys] button--active NOT found in ancestors.");
+            }
+            return false;
         }
 
         private InputControl GetInputControl(string keyId)
