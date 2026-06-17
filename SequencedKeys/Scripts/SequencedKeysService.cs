@@ -349,12 +349,11 @@ namespace SequencedKeys
 
         private bool IsCategoryAlreadySelected(Button button)
         {
-            var parent = button.parent;
-            if (parent == null)
+            if (_uiRoot == null)
                 return false;
 
             var siblings = new List<Button>();
-            parent.Query<Button>("ToolGroupButton").ForEach(btn => siblings.Add(btn));
+            _uiRoot.Query<Button>("ToolGroupButton").ForEach(btn => siblings.Add(btn));
 
             if (siblings.Count < 2)
                 return false;
