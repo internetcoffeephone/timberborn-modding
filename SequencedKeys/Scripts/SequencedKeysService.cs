@@ -37,6 +37,7 @@ namespace SequencedKeys
         private InputControl _heldControl;
 
         private Button _lastClickedCategoryButton;
+        private bool _retriedCategoryClick;
 
         // Physical controls and keyIds owned by this mod. Used to suppress other
         // key bindings (e.g. game speed on 1/2/3, transparency on T) that share a
@@ -437,6 +438,7 @@ namespace SequencedKeys
             _currentButtons = null;
             _currentGroups = null;
             _breadcrumb = "";
+            _retriedCategoryClick = false;
             _overlay?.Hide();
         }
 
@@ -583,27 +585,16 @@ namespace SequencedKeys
             if (_showingCategories)
             {
                 var button = buttonInfo.ClickableButton;
-                bool isSameCategory = _lastClickedCategoryButton == button;
-                var existingTools = _toolbarScanner.ScanToolButtons(_uiRoot);
-
-                if (isSameCategory && existingTools.Count > 0)
-                {
-                    Debug.Log($"[SequencedKeys] Same category already open ({existingTools.Count} tools) " +
-                              $"— skipping click, progressing to tools.");
-                    _showingCategories = false;
-                    ScanAndShow();
-                    return;
-                }
-
                 _lastClickedCategoryButton = button;
+                _retriedCategoryClick = false;
+
                 using (var clickEvt = ClickEvent.GetPooled())
                 {
                     clickEvt.target = button;
                     button.SendEvent(clickEvt);
                 }
 
-                Debug.Log($"[SequencedKeys] Category clicked (sameAsPrev={isSameCategory}, " +
-                          $"existingTools={existingTools.Count}) — scheduling tool scan in 5 frames.");
+                Debug.Log("[SequencedKeys] Category clicked — scheduling tool scan in 5 frames.");
                 _deferredScanCountdown = 5;
             }
             else
@@ -625,7 +616,23 @@ namespace SequencedKeys
             if (!_isActive || _uiRoot == null)
                 return;
 
-            Debug.Log("[SequencedKeys] RescanAfterClick — switching to tool buttons.");
+            var tools = _toolbarScanner.ScanToolButtons(_uiRoot);
+
+            if (tools.Count == 0 && _lastClickedCategoryButton != null && !_retriedCategoryClick)
+            {
+                Debug.Log("[SequencedKeys] RescanAfterClick: 0 tools (category toggled closed) — re-clicking to reopen.");
+                _retriedCategoryClick = true;
+                using (var clickEvt = ClickEvent.GetPooled())
+                {
+                    clickEvt.target = _lastClickedCategoryButton;
+                    _lastClickedCategoryButton.SendEvent(clickEvt);
+                }
+                _deferredScanCountdown = 5;
+                return;
+            }
+
+            Debug.Log($"[SequencedKeys] RescanAfterClick — switching to tool buttons ({tools.Count} found).");
+            _retriedCategoryClick = false;
             _showingCategories = false;
             ScanAndShow();
         }
