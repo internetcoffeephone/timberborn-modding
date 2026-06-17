@@ -345,6 +345,44 @@ namespace SequencedKeys
             return mouse != null && mouse.rightButton.wasPressedThisFrame;
         }
 
+        private bool _loggedCategoryClasses;
+
+        private bool IsCategoryAlreadySelected(Button button)
+        {
+            var parent = button.parent;
+            if (parent == null)
+                return false;
+
+            var siblings = new List<Button>();
+            parent.Query<Button>("ToolGroupButton").ForEach(btn => siblings.Add(btn));
+
+            if (siblings.Count < 2)
+                return false;
+
+            var classCounts = new Dictionary<string, int>();
+            foreach (var btn in siblings)
+                foreach (var cls in btn.GetClasses())
+                {
+                    classCounts.TryGetValue(cls, out int count);
+                    classCounts[cls] = count + 1;
+                }
+
+            if (!_loggedCategoryClasses)
+            {
+                _loggedCategoryClasses = true;
+                var allClasses = new List<string>(classCounts.Keys);
+                allClasses.Sort();
+                Debug.Log($"[SequencedKeys] Category button CSS classes ({siblings.Count} buttons): " +
+                          $"[{string.Join(", ", allClasses.ConvertAll(c => c + ":" + classCounts[c]))}]");
+            }
+
+            foreach (var cls in button.GetClasses())
+                if (cls.Contains("--") && classCounts.TryGetValue(cls, out int count) && count == 1)
+                    return true;
+
+            return false;
+        }
+
         private InputControl GetInputControl(string keyId)
         {
             try
@@ -585,6 +623,17 @@ namespace SequencedKeys
             if (_showingCategories)
             {
                 var button = buttonInfo.ClickableButton;
+
+                if (IsCategoryAlreadySelected(button))
+                {
+                    Debug.Log("[SequencedKeys] Category already selected — skipping click, progressing to tools.");
+                    _lastClickedCategoryButton = button;
+                    _retriedCategoryClick = false;
+                    _showingCategories = false;
+                    ScanAndShow();
+                    return;
+                }
+
                 _lastClickedCategoryButton = button;
                 _retriedCategoryClick = false;
 
