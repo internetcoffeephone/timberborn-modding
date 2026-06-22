@@ -20,6 +20,7 @@ namespace SequencedKeys
 
         private bool _loggedStructure;
         private bool _loggedToolButtons;
+        private bool _loggedSubSectionMissing;
 
         public List<ButtonInfo> ScanCategories(VisualElement rootVisualElement)
         {
@@ -38,11 +39,24 @@ namespace SequencedKeys
             if (target == null)
                 return new List<ButtonInfo>();
 
-            var results = ScanByButtonName(target, "ToolButton");
+            // Scan within SubSection only — that's where the opened category's
+            // tool buttons live. Scanning the entire BottomBar would also pick
+            // up standalone tools (e.g. the Select/cursor button) from other
+            // sections, causing off-by-one key mappings.
+            var subSection = target.Q("SubSection");
+            var scanRoot = subSection ?? target;
 
-            var extraCount = ScanNonCategoryButtons(target, results);
+            if (subSection == null && !_loggedSubSectionMissing)
+            {
+                _loggedSubSectionMissing = true;
+                Debug.Log("[SequencedKeys] ScanToolButtons: SubSection not found, falling back to full BottomBar scan.");
+            }
+
+            var results = ScanByButtonName(scanRoot, "ToolButton");
+
+            var extraCount = ScanNonCategoryButtons(scanRoot, results);
             Debug.Log($"[SequencedKeys] ScanToolButtons: found {results.Count} tool button(s) " +
-                      $"({extraCount} non-standard).");
+                      $"({extraCount} non-standard) in '{scanRoot.name}'.");
 
             if (!_loggedToolButtons && results.Count > 0)
             {
